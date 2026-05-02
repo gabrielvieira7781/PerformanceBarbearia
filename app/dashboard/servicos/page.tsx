@@ -1,380 +1,353 @@
-// app/admin/dashboard/servicos/page.tsx
+// app/dashboard/servicos/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Scissors, Tag, Pencil, X, Trash2 } from 'lucide-react';
+import { Scissors, User, Phone, Wallet, Plus, Trash2, CheckCircle2, AlertCircle, ShoppingCart } from 'lucide-react';
 
 interface ServiceType {
   id: string;
   name: string;
   price: number;
-  description: string | null;
   isActive: boolean;
 }
 
-export default function ServicosPage() {
-  const [services, setServices] = useState<ServiceType[]>([]);
+interface CartItem extends ServiceType {
+  cartId: string;
+}
+
+interface ClientType {
+  id: string;
+  name: string;
+  phone: string;
+}
+
+export default function LancamentoPage() {
+  const [catalog, setCatalog] = useState<ServiceType[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Estados do formulário
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [price, setPrice] = useState('');
-  const [description, setDescription] = useState('');
-  const [isActive, setIsActive] = useState(true);
+  // Lista de clientes para o autocompletar
+  const [clientsDb, setClientsDb] = useState<ClientType[]>([]);
+  const [showClientList, setShowClientList] = useState(false);
   
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Dados do Formulário
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [discount, setDiscount] = useState('');
 
-  const fetchServices = async () => {
-    try {
-      const res = await fetch('/api/services');
-      if (res.ok) {
-        const data = await res.json();
-        setServices(data);
-      }
-    } catch (err) {
-      console.error("Erro ao buscar serviços:", err);
-    } finally {
-      setLoading(false);
-    }
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4000);
   };
 
   useEffect(() => {
-    fetchServices();
+    const fetchData = async () => {
+      try {
+        // Busca o catálogo de serviços
+        const resServices = await fetch('/api/services');
+        if (resServices.ok) {
+          const dataServices = await resServices.json();
+          setCatalog(dataServices.filter((s: ServiceType) => s.isActive));
+        }
+
+        // Busca os clientes já cadastrados
+        const resClients = await fetch('/api/clientes');
+        if (resClients.ok) {
+          const dataClients = await resClients.json();
+          setClientsDb(dataClients);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar dados iniciais", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
-  const handleEditClick = (service: ServiceType) => {
-    setEditingId(service.id);
-    setName(service.name);
-    setPrice(service.price.toString());
-    setDescription(service.description || '');
-    setIsActive(service.isActive);
-    setError('');
-    setSuccess('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setName('');
-    setPrice('');
-    setDescription('');
-    setIsActive(true);
-    setError('');
-  };
-
-  const handleToggleStatus = async (service: ServiceType) => {
-    setError('');
-    setSuccess('');
+  // Função para formatar o telefone no padrão WhatsApp (XX) XXXXX-XXXX
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
     
-    // Atualiza a interface instantaneamente (Optimistic UI)
-    const newStatus = !service.isActive;
-    setServices(services.map(s => s.id === service.id ? { ...s, isActive: newStatus } : s));
-
-    try {
-      const res = await fetch(`/api/services/${service.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: service.name,
-          price: service.price,
-          description: service.description,
-          isActive: newStatus
-        })
-      });
-
-      if (!res.ok) {
-        fetchServices();
-        const data = await res.json();
-        setError(data.message || 'Erro ao alterar o status do serviço.');
-      } else {
-        setSuccess(newStatus ? 'Serviço ativado!' : 'Serviço inativado!');
-        setTimeout(() => setSuccess(''), 2000);
-      }
-    } catch (err) {
-      fetchServices();
-      setError('Erro de conexão com o servidor.');
+    if (value.length <= 11) {
+      value = value.replace(/^(\d{2})(\d)/g, '($1) $2');
+      value = value.replace(/(\d{5})(\d)/, '$1-$2');
     }
+    
+    setClientPhone(value);
   };
 
-  const handleDeleteClick = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.')) {
-      return;
-    }
-
-    setError('');
-    setSuccess('');
-
-    try {
-      const res = await fetch(`/api/services/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        setSuccess('Serviço excluído com sucesso!');
-        fetchServices();
-      } else {
-        const data = await res.json();
-        setError(data.message || 'Erro ao excluir o serviço.');
-      }
-    } catch (err) {
-      setError('Erro de conexão com o servidor.');
-    } finally {
-      setTimeout(() => setSuccess(''), 4000);
-    }
+  const handleSelectExistingClient = (client: ClientType) => {
+    setClientName(client.name);
+    setClientPhone(client.phone);
+    setShowClientList(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const addToCart = (service: ServiceType) => {
+    setCart([...cart, { ...service, cartId: Math.random().toString(36).substring(7) }]);
+  };
+
+  const removeFromCart = (cartId: string) => {
+    setCart(cart.filter(item => item.cartId !== cartId));
+  };
+
+  const subtotal = cart.reduce((acc, item) => acc + item.price, 0);
+  const discountValue = Number(discount) || 0;
+  const total = Math.max(0, subtotal - discountValue);
+
+  const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    
+    if (cart.length === 0) return showToast('Adicione pelo menos um serviço ao carrinho.', 'error');
+    if (!clientName) return showToast('O nome do cliente é obrigatório.', 'error');
+    if (!paymentMethod) return showToast('Selecione a forma de pagamento.', 'error');
+
+    // Remove a formatação visual do telefone antes de enviar para o banco
+    const cleanPhone = clientPhone.replace(/\D/g, '');
+
     setIsSubmitting(true);
 
-    if (!name || !price) {
-      setError('O nome do serviço e o preço são obrigatórios.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    const formattedPrice = price.replace(',', '.');
-
     try {
-      const url = editingId ? `/api/services/${editingId}` : '/api/services';
-      const method = editingId ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method: method,
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
-          price: formattedPrice,
-          description,
-          isActive: editingId ? isActive : true 
+          clientName,
+          clientPhone: cleanPhone,
+          cart,
+          paymentMethod,
+          discount: discountValue,
+          totalToPay: total
         })
       });
 
       if (res.ok) {
-        setSuccess(editingId ? 'Serviço atualizado com sucesso!' : 'Serviço cadastrado com sucesso!');
-        handleCancelEdit();
-        fetchServices();
+        showToast('Serviço lançado com sucesso!', 'success');
+        
+        // Atualiza a lista de clientes silenciosamente caso seja um cliente novo
+        fetch('/api/clientes').then(r => r.json()).then(data => setClientsDb(data)).catch(() => {});
+
+        // Limpa o PDV para o próximo cliente
+        setCart([]);
+        setClientName('');
+        setClientPhone('');
+        setPaymentMethod('');
+        setDiscount('');
       } else {
         const data = await res.json();
-        setError(data.message || 'Erro ao processar serviço.');
+        showToast(data.message || 'Erro ao processar o lançamento.', 'error');
       }
-    } catch (err) {
-      setError('Erro de conexão com o servidor.');
+    } catch (error) {
+      showToast('Erro de conexão com o servidor.', 'error');
     } finally {
       setIsSubmitting(false);
-      setTimeout(() => setSuccess(''), 3000);
     }
   };
 
+  // Filtra os clientes baseados no que o barbeiro digitou
+  const filteredClients = clientsDb.filter(c => 
+    c.name.toLowerCase().includes(clientName.toLowerCase()) || 
+    c.phone.includes(clientPhone.replace(/\D/g, ''))
+  );
+
   return (
-    <div className="p-8">
+    <div className="p-8 max-w-7xl mx-auto">
+      {toast.show && (
+        <div className={`fixed top-5 right-5 z-50 px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 transition-all ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+          {toast.type === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
+          <p className="font-bold">{toast.message}</p>
+        </div>
+      )}
+
       <header className="mb-8 border-b border-zinc-800 pb-4">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
           <Scissors className="text-[#FFD700]" size={32} />
-          Serviços e Preços
+          Lançar Serviço
         </h1>
-        <p className="text-zinc-400 mt-2">
-          Cadastre e gerencie os cortes, produtos e serviços oferecidos pela sua barbearia.
-        </p>
+        <p className="text-zinc-400 mt-2">Selecione os serviços realizados e finalize o atendimento.</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Formulário */}
-        <div className="lg:col-span-1">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 sticky top-6">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              {editingId ? (
-                <>
-                  <Pencil className="text-[#FFD700]" size={20} />
-                  Editar Serviço
-                </>
-              ) : (
-                <>
-                  <Plus className="text-[#FFD700]" size={20} />
-                  Novo Serviço
-                </>
-              )}
-            </h2>
-
-            {error && (
-              <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm">
-                {error}
-              </div>
-            )}
-
-            {success && (
-              <div className="bg-green-500/10 border border-green-500 text-green-500 p-3 rounded mb-4 text-sm">
-                {success}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">Nome do Serviço *</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors"
-                  placeholder="Ex: Corte Degradê"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">Preço Padrão (R$) *</label>
-                <input
-                  type="text"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors"
-                  placeholder="Ex: 45.00"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">Descrição (Opcional)</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors resize-none h-24"
-                  placeholder="Detalhes sobre o serviço..."
-                />
-              </div>
-
-              {/* Botão de Toggle blindado com cor nativa (Formulário) */}
-              {editingId && (
-                <div className="flex items-center gap-3 py-2">
-                  <div
-                    onClick={() => setIsActive(!isActive)}
-                    className="w-11 h-6 rounded-full cursor-pointer relative flex items-center px-0.5 transition-colors duration-300"
-                    style={{ backgroundColor: isActive ? '#22c55e' : '#3f3f46' }}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${
-                        isActive ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-zinc-300">
-                    {isActive ? 'Serviço Ativo' : 'Serviço Inativo'}
-                  </span>
-                </div>
-              )}
-
-              <div className="pt-2 flex flex-col gap-2">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-[#FFD700] text-black font-bold rounded px-4 py-3 hover:bg-yellow-500 transition-colors disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Salvando...' : (editingId ? 'Atualizar Serviço' : 'Salvar Serviço')}
-                </button>
-
-                {editingId && (
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="w-full bg-transparent border border-zinc-700 text-white font-bold rounded px-4 py-3 hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <X size={18} />
-                    Cancelar
-                  </button>
-                )}
-              </div>
-            </form>
-          </div>
-        </div>
-
-        {/* Tabela de Serviços */}
+        {/* Lado Esquerdo: Catálogo de Serviços */}
         <div className="lg:col-span-2">
           <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <Tag className="text-[#FFD700]" size={20} />
+              <Plus className="text-[#FFD700]" size={20} />
               Catálogo de Serviços
             </h2>
 
             {loading ? (
-              <div className="text-center py-12 text-zinc-500">
-                Carregando catálogo...
-              </div>
-            ) : services.length === 0 ? (
+              <div className="text-center py-12 text-zinc-500">Carregando catálogo...</div>
+            ) : catalog.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-zinc-800 rounded-lg">
-                <p className="text-zinc-500">Nenhum serviço cadastrado ainda.</p>
-                <p className="text-zinc-600 text-sm mt-1">Use o formulário ao lado para começar.</p>
+                <p className="text-zinc-500">Nenhum serviço ativo encontrado.</p>
+                <p className="text-zinc-600 text-sm mt-1">Peça para o administrador cadastrar os serviços no painel.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="py-3 px-4 text-zinc-400 font-medium">Serviço</th>
-                      <th className="py-3 px-4 text-zinc-400 font-medium hidden md:table-cell text-center">Status</th>
-                      <th className="py-3 px-4 text-zinc-400 font-medium text-right">Preço</th>
-                      <th className="py-3 px-4 text-zinc-400 font-medium text-center w-28">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {services.map((service) => (
-                      <tr key={service.id} className={`border-b border-zinc-800/50 transition-colors ${!service.isActive ? 'opacity-50 hover:opacity-100' : 'hover:bg-zinc-800/20'}`}>
-                        <td className="py-4 px-4 text-white font-medium">
-                          {service.name}
-                        </td>
-                        
-                        {/* Botão de Toggle blindado com cor nativa (Tabela) */}
-                        <td className="py-4 px-4 hidden md:table-cell">
-                          <div className="flex justify-center">
-                            <div
-                              onClick={() => handleToggleStatus(service)}
-                              title={service.isActive ? "Desativar serviço" : "Ativar serviço"}
-                              className="w-11 h-6 rounded-full cursor-pointer relative flex items-center px-0.5 transition-colors duration-300"
-                              style={{ backgroundColor: service.isActive ? '#22c55e' : '#3f3f46' }}
-                            >
-                              <div
-                                className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${
-                                  service.isActive ? 'translate-x-5' : 'translate-x-0'
-                                }`}
-                              />
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-4 px-4 text-[#FFD700] font-bold text-right whitespace-nowrap">
-                          {new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL'
-                          }).format(service.price)}
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <button 
-                              onClick={() => handleEditClick(service)}
-                              className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded transition-colors"
-                              title="Editar Serviço"
-                            >
-                              <Pencil size={16} />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteClick(service.id)}
-                              className="p-2 bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-500 rounded transition-colors"
-                              title="Excluir Serviço"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {catalog.map(service => (
+                  <button
+                    key={service.id}
+                    onClick={() => addToCart(service)}
+                    className="flex flex-col text-left bg-black border border-zinc-800 p-4 rounded-lg hover:border-[#FFD700] hover:bg-zinc-800/50 transition-all group"
+                  >
+                    <span className="text-white font-medium group-hover:text-[#FFD700] transition-colors line-clamp-1">{service.name}</span>
+                    <span className="text-zinc-400 font-mono mt-2">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price)}
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
+        </div>
+
+        {/* Lado Direito: Carrinho e Checkout */}
+        <div className="lg:col-span-1">
+          <form onSubmit={handleCheckout} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 sticky top-6">
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <ShoppingCart className="text-[#FFD700]" size={20} />
+              Resumo do Atendimento
+            </h2>
+
+            {/* Dados do Cliente */}
+            <div className="space-y-4 mb-6 pb-6 border-b border-zinc-800 relative">
+              <div className="relative">
+                <label className="block text-sm font-medium text-zinc-400 mb-1">Nome do Cliente *</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-2.5 text-zinc-500" size={16} />
+                  <input
+                    type="text"
+                    value={clientName}
+                    onChange={(e) => {
+                      setClientName(e.target.value);
+                      setShowClientList(true);
+                    }}
+                    onFocus={() => setShowClientList(true)}
+                    className="w-full bg-black border border-zinc-800 text-white rounded pl-9 pr-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors"
+                    placeholder="Ex: João Silva"
+                  />
+                </div>
+                
+                {/* Dropdown de Autocompletar */}
+                {showClientList && clientName.length > 1 && filteredClients.length > 0 && (
+                  <div className="absolute top-full left-0 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-20 max-h-40 overflow-y-auto custom-scrollbar">
+                    {filteredClients.map(client => (
+                      <div 
+                        key={client.id} 
+                        onClick={() => handleSelectExistingClient(client)}
+                        className="p-3 hover:bg-zinc-700 cursor-pointer border-b border-zinc-700/50 last:border-0"
+                      >
+                        <p className="text-white text-sm font-medium">{client.name}</p>
+                        <p className="text-zinc-400 text-xs">{client.phone ? `WhatsApp: ${client.phone}` : 'Sem telefone'}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-1">Telefone (WhatsApp)</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-2.5 text-zinc-500" size={16} />
+                  <input
+                    type="text"
+                    value={clientPhone}
+                    onChange={handlePhoneChange}
+                    maxLength={15}
+                    className="w-full bg-black border border-zinc-800 text-white rounded pl-9 pr-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors font-mono"
+                    placeholder="(00) 00000-0000"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Lista do Carrinho */}
+            <div className="mb-6 min-h-[120px] max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
+              {cart.length === 0 ? (
+                <div className="text-center text-zinc-500 text-sm py-8 italic">
+                  Nenhum serviço selecionado.
+                </div>
+              ) : (
+                <ul className="space-y-3">
+                  {cart.map(item => (
+                    <li key={item.cartId} className="flex justify-between items-center bg-black p-3 rounded border border-zinc-800">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-white font-medium">{item.name}</span>
+                        <span className="text-xs text-zinc-500 font-mono">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+                        </span>
+                      </div>
+                      <button type="button" onClick={() => removeFromCart(item.cartId)} className="text-red-500 hover:text-red-400 p-1 transition-colors" title="Remover">
+                        <Trash2 size={16} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Pagamento e Totais */}
+            <div className="space-y-4 pt-4 border-t border-zinc-800">
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Pagamento *</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full bg-black border border-zinc-800 text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-[#FFD700] transition-colors appearance-none"
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="Dinheiro">💵 Dinheiro</option>
+                    <option value="Pix">💠 Pix</option>
+                    <option value="Débito">💳 Débito</option>
+                    <option value="Crédito">💳 Crédito</option>
+                  </select>
+                </div>
+                <div className="w-24">
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Desconto</label>
+                  <input
+                    type="number"
+                    value={discount}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    className="w-full bg-black border border-zinc-800 text-white rounded px-3 py-2 text-sm text-right focus:outline-none focus:border-[#FFD700] transition-colors"
+                    placeholder="R$ 0,00"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-black/50 p-4 rounded-lg border border-zinc-800 mt-4">
+                <div className="flex justify-between text-sm text-zinc-400 mb-2">
+                  <span>Subtotal</span>
+                  <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
+                </div>
+                {discountValue > 0 && (
+                  <div className="flex justify-between text-sm text-red-400 mb-2">
+                    <span>Desconto</span>
+                    <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountValue)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center text-lg font-bold text-[#FFD700] pt-2 border-t border-zinc-800/50 mt-2">
+                  <span>TOTAL</span>
+                  <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting || cart.length === 0}
+                className="w-full bg-[#FFD700] text-black font-bold rounded py-4 flex items-center justify-center gap-2 hover:bg-yellow-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4 uppercase tracking-wider"
+              >
+                <Wallet size={20} />
+                {isSubmitting ? 'Processando...' : 'Finalizar Atendimento'}
+              </button>
+            </div>
+          </form>
         </div>
 
       </div>
