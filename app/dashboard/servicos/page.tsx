@@ -171,10 +171,31 @@ export default function LancamentoPage() {
     }
   };
 
-  const filteredClients = clientsDb.filter(c => 
-    c.name.toLowerCase().includes(clientName.toLowerCase()) || 
-    (c.phone && c.phone.includes(clientPhone.replace(/\D/g, '')))
-  );
+  const filteredClients = clientsDb.filter(c => {
+    const searchName = clientName.toLowerCase();
+    const searchPhone = clientPhone.replace(/\D/g, '');
+
+    let isMatch = true;
+
+    // 1. Filtra pelo que foi digitado no campo de Nome
+    if (searchName) {
+      // Tenta achar no nome
+      const matchName = c.name.toLowerCase().includes(searchName);
+      
+      // Se você digitar números no campo de nome, ele tenta achar no telefone também!
+      const nameAsPhone = clientName.replace(/\D/g, '');
+      const matchPhone = nameAsPhone.length > 0 && c.phone ? c.phone.includes(nameAsPhone) : false;
+      
+      isMatch = matchName || matchPhone;
+    }
+
+    // 2. Se o campo de Telefone for preenchido, restringe a busca a ele também
+    if (searchPhone && isMatch) {
+      isMatch = c.phone ? c.phone.includes(searchPhone) : false;
+    }
+
+    return isMatch;
+  });
 
   return (
     <div className="p-8 max-w-7xl mx-auto">

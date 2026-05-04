@@ -5,15 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  LayoutDashboard, 
-  Scissors, 
-  Users, 
-  Wallet, 
-  MessageSquare, 
-  Settings,
-  LogOut,
-  PlayCircle,
-  Crown
+  LayoutDashboard, Scissors, Users, Wallet, MessageSquare, Settings, LogOut, PlayCircle, Crown
 } from 'lucide-react';
 
 export default function AdminDashboardLayout({
