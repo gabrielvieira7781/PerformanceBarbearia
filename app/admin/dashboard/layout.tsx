@@ -11,7 +11,9 @@ import {
   Wallet, 
   MessageSquare, 
   Settings,
-  LogOut 
+  LogOut,
+  PlayCircle,
+  Crown
 } from 'lucide-react';
 
 export default function AdminDashboardLayout({
@@ -23,11 +25,7 @@ export default function AdminDashboardLayout({
 
   const handleLogout = async () => {
     try {
-      // Chama a rota do servidor para destruir os cookies httpOnly
       await fetch('/api/auth/logout', { method: 'POST' });
-      
-      // Usa o window.location para forçar uma limpeza completa da memória do navegador 
-      // e redirecionar para a tela de login.
       window.location.href = '/login';
     } catch (error) {
       console.error("Erro ao sair:", error);
@@ -37,6 +35,7 @@ export default function AdminDashboardLayout({
   const menuItems = [
     { name: 'Visão Geral', href: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Serviços e Preços', href: '/admin/dashboard/servicos', icon: Scissors },
+    { name: 'Planos e Assinaturas', href: '/admin/dashboard/planos', icon: Crown},
     { name: 'Gestão de Equipe', href: '/admin/dashboard/equipe', icon: Users },
     { name: 'Automação WhatsApp', href: '/admin/dashboard/mensagens', icon: MessageSquare },
     { name: 'Financeiro e Caixa', href: '/admin/dashboard/financeiro', icon: Wallet },
@@ -53,7 +52,7 @@ export default function AdminDashboardLayout({
           </h2>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4">
+        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -75,7 +74,18 @@ export default function AdminDashboardLayout({
           })}
         </nav>
 
-        <div className="p-4 border-t border-zinc-800">
+        {/* Rodapé da Sidebar com Modo Trabalho e Logout */}
+        <div className="p-4 border-t border-zinc-800 space-y-2">
+          
+          {/* O Botão Mágico para o Modo de Lançamento */}
+          <Link 
+            href="/dashboard/servicos"
+            className="flex items-center justify-center gap-2 px-4 py-3 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded transition-colors shadow-lg animate-pulse"
+          >
+            <PlayCircle size={20} />
+            <span>Painel de Trabalho</span>
+          </Link>
+
           <button 
             onClick={handleLogout}
             className="flex items-center gap-3 px-4 py-3 w-full text-left text-zinc-400 hover:bg-red-500/10 hover:text-red-500 rounded transition-colors"
@@ -87,7 +97,7 @@ export default function AdminDashboardLayout({
       </aside>
 
       {/* Conteúdo Principal */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto bg-black">
         {children}
       </main>
     </div>

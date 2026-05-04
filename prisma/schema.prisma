@@ -15,17 +15,18 @@ datasource db {
 model Barbershop {
   id        String   @id @default(cuid())
   name      String
-  document  String   // CNPJ ou CPF
+  document  String   
   address   String
   phone     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users            User[]
-  clients          Client[]
-  serviceTypes     ServiceType[]
-  serviceLogs      ServiceLog[]
-  financialRecords FinancialRecord[]
+  users             User[]
+  clients           Client[]
+  serviceTypes      ServiceType[]
+  serviceLogs       ServiceLog[]
+  financialRecords  FinancialRecord[]
+  subscriptionPlans SubscriptionPlan[]
 }
 
 // ==========================================
@@ -37,8 +38,9 @@ model User {
   name                    String
   email                   String       @unique
   password                String
-  role                    String       @default("BARBER") // Pode ser ADMIN ou BARBER
-  isActive                Boolean      @default(true)   // NOVO: Controle de acesso do funcionário
+  role                    String       @default("BARBER") 
+  permissions             String[]     @default([])       
+  isActive                Boolean      @default(true)
   isVerified              Boolean      @default(false)
   verificationCode        String?
   verificationCodeExpires DateTime?
@@ -50,18 +52,48 @@ model User {
 }
 
 // ==========================================
+// Tabela de Planos de Assinatura (Clube)
+// ==========================================
+model SubscriptionPlan {
+  id           String   @id @default(cuid())
+  barbershopId String
+  name         String
+  price        Float
+  maxCuts      Int      // Quantidade liberada por ciclo
+  billingCycle String   @default("MONTHLY") // NOVO: MONTHLY, QUARTERLY, SEMIANNUAL, ANNUAL
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  services     ServiceType[] // NOVO: Serviços incluídos neste plano
+  clients      Client[]
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+}
+
+// ==========================================
 // Tabela de Clientes
 // ==========================================
 model Client {
-  id           String   @id @default(cuid())
-  barbershopId String?
-  name         String
-  phone        String   @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  barbershopId      String?
+  name              String
+  phone             String
+  isActive          Boolean  @default(true)
+  
+  parentId          String?
+  parent            Client?  @relation("FamilyLink", fields: [parentId], references: [id])
+  dependents        Client[] @relation("FamilyLink")
 
-  barbershop   Barbershop? @relation(fields: [barbershopId], references: [id])
-  services     ServiceLog[]
+  // Clube de Assinatura Atualizado
+  planId            String?
+  plan              SubscriptionPlan? @relation(fields: [planId], references: [id])
+  cutsUsedThisMonth Int      @default(0) // RESTAURADO: Nome original para não perder dados
+  planExpiresAt     DateTime?            // NOVO: Data exata em que o plano vence!
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  barbershop        Barbershop?  @relation(fields: [barbershopId], references: [id])
+  services          ServiceLog[]
 }
 
 // ==========================================
@@ -71,11 +103,12 @@ model ServiceType {
   id           String   @id @default(cuid())
   barbershopId String?
   name         String
+  description  String?  
   price        Float
-  description  String?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  plans        SubscriptionPlan[] // NOVO: Planos que aceitam este serviço
 
   barbershop   Barbershop?  @relation(fields: [barbershopId], references: [id])
   logs         ServiceLog[]
@@ -95,10 +128,10 @@ model ServiceLog {
   status        String   @default("COMPLETED")
   date          DateTime @default(now())
 
-  barbershop    Barbershop? @relation(fields: [barbershopId], references: [id])
-  user          User        @relation(fields: [userId], references: [id])
-  client        Client      @relation(fields: [clientId], references: [id])
-  serviceType   ServiceType @relation(fields: [serviceTypeId], references: [id])
+  barbershop    Barbershop?  @relation(fields: [barbershopId], references: [id])
+  user          User         @relation(fields: [userId], references: [id])
+  client        Client       @relation(fields: [clientId], references: [id])
+  serviceType   ServiceType  @relation(fields: [serviceTypeId], references: [id])
 }
 
 // ==========================================
@@ -107,12 +140,12 @@ model ServiceLog {
 model FinancialRecord {
   id           String   @id @default(cuid())
   barbershopId String?
-  type         String   // INCOME ou EXPENSE
+  type         String   
   amount       Float
   description  String
   date         DateTime @default(now())
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  barbershop   Barbershop? @relation(fields: [barbershopId], references: [id])
+  barbershop   Barbershop?  @relation(fields: [barbershopId], references: [id])
 }

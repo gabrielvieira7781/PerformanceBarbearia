@@ -32,7 +32,8 @@ export async function GET() {
                 name: true,
                 email: true,
                 createdAt: true,
-                isActive: true
+                isActive: true,
+                permissions: true // NOVO: Traz as permissões
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -49,13 +50,12 @@ export async function POST(request: Request) {
         if (!barbershopId) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
 
         const body = await request.json();
-        const { name, email, password } = body;
+        const { name, email, password, permissions } = body;
 
         if (!name || !email || !password) {
             return NextResponse.json({ message: 'Nome, e-mail e senha são obrigatórios.' }, { status: 400 });
         }
 
-        // Normaliza o e-mail: remove espaços vazios e joga para minúsculo
         const normalizedEmail = email.toLowerCase().trim();
 
         const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
@@ -71,9 +71,10 @@ export async function POST(request: Request) {
                 role: 'BARBER',
                 isVerified: true,
                 isActive: true,
-                barbershopId: barbershopId
+                barbershopId: barbershopId,
+                permissions: permissions || [] // NOVO: Salva as permissões
             },
-            select: { id: true, name: true, email: true, isActive: true }
+            select: { id: true, name: true, email: true, isActive: true, permissions: true }
         });
 
         return NextResponse.json(newBarber, { status: 201 });

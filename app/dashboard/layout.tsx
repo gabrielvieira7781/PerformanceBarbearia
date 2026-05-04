@@ -1,7 +1,7 @@
 // app/dashboard/layout.tsx
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -10,7 +10,8 @@ import {
   Users, 
   Wallet, 
   MessageSquare, 
-  LogOut 
+  LogOut,
+  ShieldAlert
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -19,14 +20,35 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [canAccessAdmin, setCanAccessAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkPermissions = () => {
+      // Pega o cargo
+      const roleMatch = document.cookie.match(new RegExp('(^| )user_role=([^;]+)'));
+      const role = roleMatch ? roleMatch[2] : '';
+      
+      // Pega as permissões
+      const permsMatch = document.cookie.match(new RegExp('(^| )user_permissions=([^;]+)'));
+      let permissions: string[] = [];
+      if (permsMatch) {
+        try { permissions = JSON.parse(decodeURIComponent(permsMatch[2])); } catch (e) {}
+      }
+
+      if (role === 'ADMIN') {
+        setIsAdmin(true);
+        setCanAccessAdmin(true);
+      } else if (permissions.includes('admin_panel')) {
+        setCanAccessAdmin(true);
+      }
+    };
+    checkPermissions();
+  }, []);
 
   const handleLogout = async () => {
     try {
-      // Chama a rota do servidor para destruir os cookies httpOnly com segurança máxima
       await fetch('/api/auth/logout', { method: 'POST' });
-      
-      // Usa o window.location para forçar uma limpeza completa da memória do navegador 
-      // e redirecionar para a tela de login.
       window.location.href = '/login';
     } catch (error) {
       console.error("Erro ao sair:", error);
@@ -49,9 +71,11 @@ export default function DashboardLayout({
           <h2 className="text-2xl font-bold text-white tracking-wider">
             SISTEMA<span className="text-[#FFD700]">.</span>
           </h2>
+          {isAdmin && <span className="text-[10px] bg-emerald-500/20 text-emerald-500 px-2 py-0.5 rounded font-bold mt-1 inline-block uppercase">Modo Trabalho Ativo</span>}
+          {!isAdmin && canAccessAdmin && <span className="text-[10px] bg-blue-500/20 text-blue-500 px-2 py-0.5 rounded font-bold mt-1 inline-block uppercase">Acesso Gerencial</span>}
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4">
+        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -73,7 +97,19 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        <div className="p-4 border-t border-zinc-800">
+        <div className="p-4 border-t border-zinc-800 space-y-2">
+          
+          {/* Botão de Retorno: Agora aparece para Donos E Gerentes permitidos */}
+          {canAccessAdmin && (
+            <Link 
+              href="/admin/dashboard"
+              className="flex items-center justify-center gap-2 px-4 py-3 w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded transition-colors shadow-lg border border-zinc-600"
+            >
+              <ShieldAlert size={20} className="text-[#FFD700]" />
+              <span>Painel Admin</span>
+            </Link>
+          )}
+
           <button 
             onClick={handleLogout}
             className="flex items-center gap-3 px-4 py-3 w-full text-left text-zinc-400 hover:bg-red-500/10 hover:text-red-500 rounded transition-colors"
@@ -85,7 +121,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Conteúdo Principal */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto bg-black">
         {children}
       </main>
     </div>

@@ -19,6 +19,14 @@ interface ClientType {
   id: string;
   name: string;
   phone: string;
+  plan?: { 
+    id: string; 
+    name: string; 
+    maxCuts: number;
+    services?: { id: string; name: string }[] 
+  } | null;
+  cutsUsedThisMonth?: number;
+  planExpiresAt?: string | null;
 }
 
 export default function LancamentoPage() {
@@ -26,11 +34,10 @@ export default function LancamentoPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Lista de clientes para o autocompletar
   const [clientsDb, setClientsDb] = useState<ClientType[]>([]);
   const [showClientList, setShowClientList] = useState(false);
   
-  // Dados do Formulário
+  const [selectedClient, setSelectedClient] = useState<ClientType | null>(null);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -47,19 +54,11 @@ export default function LancamentoPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Busca o catálogo de serviços
         const resServices = await fetch('/api/services');
-        if (resServices.ok) {
-          const dataServices = await resServices.json();
-          setCatalog(dataServices.filter((s: ServiceType) => s.isActive));
-        }
-
-        // Busca os clientes já cadastrados
+        if (resServices.ok) setCatalog((await resServices.json()).filter((s: ServiceType) => s.isActive));
+        
         const resClients = await fetch('/api/clientes');
-        if (resClients.ok) {
-          const dataClients = await resClients.json();
-          setClientsDb(dataClients);
-        }
+        if (resClients.ok) setClientsDb(await resClients.json());
       } catch (err) {
         console.error("Erro ao buscar dados iniciais", err);
       } finally {
@@ -69,46 +68,73 @@ export default function LancamentoPage() {
     fetchData();
   }, []);
 
-  // Função para formatar o telefone no padrão WhatsApp (XX) XXXXX-XXXX
+  // AUTO-SELECT INTELIGENTE: Puxa o plano se o barbeiro só digitar o nome
+  useEffect(() => {
+    if (clientName.length > 2 && !selectedClient) {
+      const match = clientsDb.find(c => c.name.toLowerCase() === clientName.toLowerCase().trim());
+      if (match) {
+        setSelectedClient(match);
+        if (match.phone && !clientPhone) setClientPhone(match.phone);
+      }
+    }
+  }, [clientName, clientsDb, selectedClient, clientPhone]);
+
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
-    
+    let value = e.target.value.replace(/\D/g, ''); 
     if (value.length <= 11) {
       value = value.replace(/^(\d{2})(\d)/g, '($1) $2');
       value = value.replace(/(\d{5})(\d)/, '$1-$2');
     }
-    
     setClientPhone(value);
   };
 
   const handleSelectExistingClient = (client: ClientType) => {
     setClientName(client.name);
-    setClientPhone(client.phone);
+    setClientPhone(client.phone || '');
+    setSelectedClient(client); 
     setShowClientList(false);
   };
 
   const addToCart = (service: ServiceType) => {
-    setCart([...cart, { ...service, cartId: Math.random().toString(36).substring(7) }]);
+    setCart(prev => [...prev, { ...service, cartId: Math.random().toString(36).substring(7) }]);
   };
 
   const removeFromCart = (cartId: string) => {
-    setCart(cart.filter(item => item.cartId !== cartId));
+    setCart(prev => prev.filter(item => item.cartId !== cartId));
   };
 
-  const subtotal = cart.reduce((acc, item) => acc + item.price, 0);
+  // CÁLCULO MÁGICO DO PLANO EM TEMPO REAL
+  const remainingPlanCuts = selectedClient?.plan ? (selectedClient.plan.maxCuts - (selectedClient.cutsUsedThisMonth || 0)) : 0;
+  let tempRemainingCuts = remainingPlanCuts;
+  
+  const calculatedCart = cart.map(item => {
+    const isCovered = selectedClient?.plan?.services?.some(s => s.id === item.id);
+    
+    if (isCovered && tempRemainingCuts > 0) {
+      tempRemainingCuts--; 
+      return { ...item, finalPrice: 0, isCoveredByPlan: true };
+    }
+    return { ...item, finalPrice: item.price, isCoveredByPlan: false };
+  });
+
+  const subtotal = calculatedCart.reduce((acc, item) => acc + item.finalPrice, 0);
   const discountValue = Number(discount) || 0;
   const total = Math.max(0, subtotal - discountValue);
 
+  // Auto seleciona pagamento via plano se o total zerar
+  useEffect(() => {
+    if (cart.length > 0 && total === 0 && paymentMethod !== 'Plano') {
+      setPaymentMethod('Plano');
+    }
+  }, [total, cart.length, paymentMethod]);
+
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (cart.length === 0) return showToast('Adicione pelo menos um serviço ao carrinho.', 'error');
     if (!clientName) return showToast('O nome do cliente é obrigatório.', 'error');
     if (!paymentMethod) return showToast('Selecione a forma de pagamento.', 'error');
 
-    // Remove a formatação visual do telefone antes de enviar para o banco
     const cleanPhone = clientPhone.replace(/\D/g, '');
-
     setIsSubmitting(true);
 
     try {
@@ -127,31 +153,27 @@ export default function LancamentoPage() {
 
       if (res.ok) {
         showToast('Serviço lançado com sucesso!', 'success');
-        
-        // Atualiza a lista de clientes silenciosamente caso seja um cliente novo
         fetch('/api/clientes').then(r => r.json()).then(data => setClientsDb(data)).catch(() => {});
-
-        // Limpa o PDV para o próximo cliente
         setCart([]);
         setClientName('');
         setClientPhone('');
         setPaymentMethod('');
         setDiscount('');
+        setSelectedClient(null); 
       } else {
         const data = await res.json();
         showToast(data.message || 'Erro ao processar o lançamento.', 'error');
       }
     } catch (error) {
-      showToast('Erro de conexão com o servidor.', 'error');
+      showToast('Erro de conexão.', 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Filtra os clientes baseados no que o barbeiro digitou
   const filteredClients = clientsDb.filter(c => 
     c.name.toLowerCase().includes(clientName.toLowerCase()) || 
-    c.phone.includes(clientPhone.replace(/\D/g, ''))
+    (c.phone && c.phone.includes(clientPhone.replace(/\D/g, '')))
   );
 
   return (
@@ -173,7 +195,6 @@ export default function LancamentoPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Lado Esquerdo: Catálogo de Serviços */}
         <div className="lg:col-span-2">
           <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
@@ -186,13 +207,13 @@ export default function LancamentoPage() {
             ) : catalog.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-zinc-800 rounded-lg">
                 <p className="text-zinc-500">Nenhum serviço ativo encontrado.</p>
-                <p className="text-zinc-600 text-sm mt-1">Peça para o administrador cadastrar os serviços no painel.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {catalog.map(service => (
                   <button
                     key={service.id}
+                    type="button"
                     onClick={() => addToCart(service)}
                     className="flex flex-col text-left bg-black border border-zinc-800 p-4 rounded-lg hover:border-[#FFD700] hover:bg-zinc-800/50 transition-all group"
                   >
@@ -207,7 +228,6 @@ export default function LancamentoPage() {
           </div>
         </div>
 
-        {/* Lado Direito: Carrinho e Checkout */}
         <div className="lg:col-span-1">
           <form onSubmit={handleCheckout} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 sticky top-6">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
@@ -215,7 +235,6 @@ export default function LancamentoPage() {
               Resumo do Atendimento
             </h2>
 
-            {/* Dados do Cliente */}
             <div className="space-y-4 mb-6 pb-6 border-b border-zinc-800 relative">
               <div className="relative">
                 <label className="block text-sm font-medium text-zinc-400 mb-1">Nome do Cliente *</label>
@@ -226,6 +245,9 @@ export default function LancamentoPage() {
                     value={clientName}
                     onChange={(e) => {
                       setClientName(e.target.value);
+                      if (selectedClient && selectedClient.name.toLowerCase() !== e.target.value.toLowerCase()) {
+                        setSelectedClient(null); 
+                      }
                       setShowClientList(true);
                     }}
                     onFocus={() => setShowClientList(true)}
@@ -234,7 +256,6 @@ export default function LancamentoPage() {
                   />
                 </div>
                 
-                {/* Dropdown de Autocompletar */}
                 {showClientList && clientName.length > 1 && filteredClients.length > 0 && (
                   <div className="absolute top-full left-0 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-20 max-h-40 overflow-y-auto custom-scrollbar">
                     {filteredClients.map(client => (
@@ -265,25 +286,57 @@ export default function LancamentoPage() {
                   />
                 </div>
               </div>
+
+              {selectedClient?.plan && (
+                <div className="mt-4 p-4 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded-lg flex flex-col gap-1 animation-scale-up">
+                  <div className="flex items-center gap-2 text-[#FFD700] font-bold text-sm uppercase">
+                    <span>👑 Cliente VIP: {selectedClient.plan.name}</span>
+                  </div>
+                  
+                  <p className="text-zinc-300 text-xs mt-1">
+                    Serviços usados: <strong className="text-white">{selectedClient.cutsUsedThisMonth || 0}</strong> de 
+                    <strong className="text-white"> {selectedClient.plan.maxCuts === 999 ? 'Ilimitado' : selectedClient.plan.maxCuts}</strong>
+                  </p>
+                  
+                  {selectedClient.planExpiresAt && (
+                    <p className="text-zinc-500 text-[10px] mt-1 flex items-center gap-1">
+                      Vence em: {new Date(selectedClient.planExpiresAt).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Lista do Carrinho */}
             <div className="mb-6 min-h-[120px] max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
-              {cart.length === 0 ? (
+              {calculatedCart.length === 0 ? (
                 <div className="text-center text-zinc-500 text-sm py-8 italic">
                   Nenhum serviço selecionado.
                 </div>
               ) : (
                 <ul className="space-y-3">
-                  {cart.map(item => (
+                  {calculatedCart.map(item => (
                     <li key={item.cartId} className="flex justify-between items-center bg-black p-3 rounded border border-zinc-800">
                       <div className="flex flex-col">
-                        <span className="text-sm text-white font-medium">{item.name}</span>
-                        <span className="text-xs text-zinc-500 font-mono">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+                        <span className="text-sm text-white font-medium flex items-center gap-2">
+                          {item.name}
+                          {item.isCoveredByPlan && (
+                            <span className="bg-[#FFD700]/20 text-[#FFD700] text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                              Plano VIP
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-xs font-mono mt-1">
+                          {item.isCoveredByPlan ? (
+                            <div className="flex gap-2 items-center">
+                              <span className="line-through text-red-400/50">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}</span>
+                              <span className="text-emerald-400 font-bold">R$ 0,00</span>
+                            </div>
+                          ) : (
+                            <span className="text-zinc-500">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}</span>
+                          )}
                         </span>
                       </div>
-                      <button type="button" onClick={() => removeFromCart(item.cartId)} className="text-red-500 hover:text-red-400 p-1 transition-colors" title="Remover">
+                      <button type="button" onClick={() => removeFromCart(item.cartId)} className="text-red-500 hover:text-red-400 p-2 transition-colors" title="Remover">
                         <Trash2 size={16} />
                       </button>
                     </li>
@@ -292,7 +345,6 @@ export default function LancamentoPage() {
               )}
             </div>
 
-            {/* Pagamento e Totais */}
             <div className="space-y-4 pt-4 border-t border-zinc-800">
               <div className="flex gap-4">
                 <div className="flex-1">
@@ -307,6 +359,7 @@ export default function LancamentoPage() {
                     <option value="Pix">💠 Pix</option>
                     <option value="Débito">💳 Débito</option>
                     <option value="Crédito">💳 Crédito</option>
+                    <option value="Plano">👑 Plano VIP</option>
                   </select>
                 </div>
                 <div className="w-24">
