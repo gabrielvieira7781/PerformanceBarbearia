@@ -187,7 +187,7 @@ export default function ClientesPage() {
   const availableParents = clients.filter(c => c.parentId === null && (!editingClient || c.id !== editingClient.id));
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto">
       {toast.show && (
         <div className={`fixed top-5 right-5 z-[100] px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 transition-all ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
           {toast.type === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
@@ -195,17 +195,17 @@ export default function ClientesPage() {
         </div>
       )}
 
-      <header className="mb-8 border-b border-zinc-800 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <header className="mb-6 md:mb-8 border-b border-zinc-800 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
             <Users className="text-[#FFD700]" size={32} />
             Gestão de Clientes
           </h1>
-          <p className="text-zinc-400 mt-2">Visualize sua base, contatos, vínculos familiares e assinaturas.</p>
+          <p className="text-zinc-400 mt-2 text-sm md:text-base">Visualize sua base, contatos, vínculos familiares e assinaturas.</p>
         </div>
         <button 
           onClick={openNewModal}
-          className="bg-[#FFD700] hover:bg-yellow-500 text-black font-bold px-6 py-3 rounded-lg transition-colors flex items-center gap-2"
+          className="bg-[#FFD700] hover:bg-yellow-500 text-black font-bold px-6 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 w-full md:w-auto"
         >
           <UserPlus size={20} />
           Novo Cliente
@@ -214,7 +214,7 @@ export default function ClientesPage() {
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
         <div className="p-4 border-b border-zinc-800 bg-black/20">
-          <div className="relative max-w-md">
+          <div className="relative max-w-md w-full">
             <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
             <input 
               type="text" 
@@ -231,91 +231,147 @@ export default function ClientesPage() {
         ) : filteredClients.length === 0 ? (
           <div className="p-12 text-center text-zinc-500">Nenhum cliente encontrado.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-zinc-800/50">
-                <tr className="text-zinc-400 text-sm font-bold uppercase tracking-wider">
-                  <th className="py-4 px-6">Nome do Cliente</th>
-                  <th className="py-4 px-6">Contato</th>
-                  <th className="py-4 px-6">Clube / Plano VIP</th>
-                  <th className="py-4 px-6">Vínculos</th>
-                  <th className="py-4 px-6 text-center">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {filteredClients.map((client) => (
-                  <tr key={client.id} className={`hover:bg-zinc-800/30 transition-colors ${!client.isActive ? 'opacity-60' : ''}`}>
-                    <td className="py-4 px-6 text-white font-medium">
-                      <div className="flex items-center gap-2">
-                        {client.name}
-                        {client.parentId && <span className="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Dependente</span>}
-                        {client.isActive === false && <span className="bg-red-500/20 text-red-500 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Bloqueado</span>}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-zinc-300 font-mono">
-                      {client.phone ? (
-                         <div className="flex items-center gap-2">
-                           <Phone size={14} className="text-zinc-500" />
-                           {client.phone.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")}
-                         </div>
-                      ) : (
-                        <span className="text-zinc-600 italic">Sem número próprio</span>
-                      )}
-                    </td>
-                    <td className="py-4 px-6">
+          <>
+            {/* VERSÃO MOBILE (CARDS) */}
+            <div className="grid grid-cols-1 gap-4 p-4 md:hidden">
+              {filteredClients.map((client) => (
+                <div key={client.id} className={`bg-black border border-zinc-800 rounded-lg p-4 flex flex-col gap-3 shadow-lg ${!client.isActive ? 'opacity-60' : ''}`}>
+                  
+                  <div className="flex flex-col">
+                    <div className="flex items-center flex-wrap gap-2 mb-1">
+                      <span className="text-white font-bold text-lg">{client.name}</span>
+                      {client.parentId && <span className="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Dependente</span>}
+                      {client.isActive === false && <span className="bg-red-500/20 text-red-500 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Bloqueado</span>}
+                    </div>
+                    <div className="flex items-center gap-2 text-zinc-400 text-sm font-mono mt-1">
+                      <Phone size={14} className="text-zinc-500" />
+                      {client.phone ? client.phone.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3") : <span className="italic">Sem número</span>}
+                    </div>
+                  </div>
+
+                  <div className="bg-zinc-900/50 p-3 rounded border border-zinc-800 text-sm space-y-2 mt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-500 text-xs uppercase font-bold">Plano VIP:</span>
                       {client.plan ? (
-                        <span className="bg-[#FFD700]/20 text-[#FFD700] text-xs px-2 py-1 rounded font-bold uppercase flex items-center gap-1 w-max">
+                        <span className="bg-[#FFD700]/20 text-[#FFD700] text-[10px] px-2 py-1 rounded font-bold uppercase flex items-center gap-1">
                            <Crown size={12} /> {client.plan.name}
                         </span>
                       ) : (
-                        <span className="text-zinc-600 text-xs italic">Sem plano</span>
-                      )}
-                    </td>
-                    <td className="py-4 px-6">
-                      {client.parent && (
-                        <div className="flex items-center gap-1 text-xs text-blue-400">
-                          <LinkIcon size={12} /> Titular: {client.parent.name}
-                        </div>
-                      )}
-                      {client.dependents && client.dependents.length > 0 && (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] text-emerald-500 font-bold uppercase">Titular de:</span>
-                          {client.dependents.map(dep => (
-                            <span key={dep.id} className="text-xs text-zinc-400 flex items-center gap-1">• {dep.name}</span>
-                          ))}
-                        </div>
-                      )}
-                      {!client.parent && (!client.dependents || client.dependents.length === 0) && (
                         <span className="text-zinc-600 text-xs italic">Nenhum</span>
                       )}
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      <div className="flex items-center justify-center gap-3">
-                        {canEdit && (
-                          <>
-                            <button onClick={() => openEditModal(client)} className="text-blue-400 hover:text-blue-300 transition-colors" title="Editar">
-                              <Edit2 size={18} />
-                            </button>
-                            <button onClick={() => handleToggleBlock(client.id, client.isActive ?? true)} className={`${client.isActive ? 'text-orange-400 hover:text-orange-300' : 'text-emerald-400 hover:text-emerald-300'} transition-colors`} title={client.isActive ? 'Bloquear Cliente' : 'Desbloquear Cliente'}>
-                              {client.isActive ? <Ban size={18} /> : <ShieldCheck size={18} />}
-                            </button>
-                          </>
-                        )}
-                        {canDelete && (
-                          <button onClick={() => handleDelete(client.id)} className="text-red-500 hover:text-red-400 transition-colors" title="Excluir Definitivamente">
-                            <Trash2 size={18} />
-                          </button>
-                        )}
-                        {!canEdit && !canDelete && (
-                          <span className="text-zinc-600 text-xs italic">Sem permissão</span>
-                        )}
+                    </div>
+                    
+                    <div className="flex justify-between items-center border-t border-zinc-800/50 pt-2">
+                      <span className="text-zinc-500 text-xs uppercase font-bold">Vínculos:</span>
+                      <div className="text-right">
+                        {client.parent && <div className="text-xs text-blue-400 font-medium">Titular: {client.parent.name}</div>}
+                        {client.dependents && client.dependents.length > 0 && <div className="text-xs text-emerald-500 font-medium">{client.dependents.length} Dependente(s)</div>}
+                        {!client.parent && (!client.dependents || client.dependents.length === 0) && <span className="text-zinc-600 text-xs italic">Nenhum</span>}
                       </div>
-                    </td>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800/50 mt-1">
+                    {canEdit && (
+                      <>
+                        <button onClick={() => openEditModal(client)} className="p-2.5 bg-zinc-800 text-blue-400 rounded"><Edit2 size={16} /></button>
+                        <button onClick={() => handleToggleBlock(client.id, client.isActive ?? true)} className={`p-2.5 bg-zinc-800 rounded ${client.isActive ? 'text-orange-400' : 'text-emerald-400'}`}>
+                          {client.isActive ? <Ban size={16} /> : <ShieldCheck size={16} />}
+                        </button>
+                      </>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => handleDelete(client.id)} className="p-2.5 bg-zinc-800 text-red-500 rounded"><Trash2 size={16} /></button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* VERSÃO DESKTOP (TABELA) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-zinc-800/50">
+                  <tr className="text-zinc-400 text-sm font-bold uppercase tracking-wider">
+                    <th className="py-4 px-6">Nome do Cliente</th>
+                    <th className="py-4 px-6">Contato</th>
+                    <th className="py-4 px-6">Clube / Plano VIP</th>
+                    <th className="py-4 px-6">Vínculos</th>
+                    <th className="py-4 px-6 text-center">Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-zinc-800">
+                  {filteredClients.map((client) => (
+                    <tr key={client.id} className={`hover:bg-zinc-800/30 transition-colors ${!client.isActive ? 'opacity-60' : ''}`}>
+                      <td className="py-4 px-6 text-white font-medium">
+                        <div className="flex items-center gap-2">
+                          {client.name}
+                          {client.parentId && <span className="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Dependente</span>}
+                          {client.isActive === false && <span className="bg-red-500/20 text-red-500 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Bloqueado</span>}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-zinc-300 font-mono">
+                        {client.phone ? (
+                           <div className="flex items-center gap-2">
+                             <Phone size={14} className="text-zinc-500" />
+                             {client.phone.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")}
+                           </div>
+                        ) : (
+                          <span className="text-zinc-600 italic">Sem número próprio</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6">
+                        {client.plan ? (
+                          <span className="bg-[#FFD700]/20 text-[#FFD700] text-xs px-2 py-1 rounded font-bold uppercase flex items-center gap-1 w-max">
+                             <Crown size={12} /> {client.plan.name}
+                          </span>
+                        ) : (
+                          <span className="text-zinc-600 text-xs italic">Sem plano</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6">
+                        {client.parent && (
+                          <div className="flex items-center gap-1 text-xs text-blue-400">
+                            <LinkIcon size={12} /> Titular: {client.parent.name}
+                          </div>
+                        )}
+                        {client.dependents && client.dependents.length > 0 && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-emerald-500 font-bold uppercase">Titular de:</span>
+                            {client.dependents.map(dep => (
+                              <span key={dep.id} className="text-xs text-zinc-400 flex items-center gap-1">• {dep.name}</span>
+                            ))}
+                          </div>
+                        )}
+                        {!client.parent && (!client.dependents || client.dependents.length === 0) && (
+                          <span className="text-zinc-600 text-xs italic">Nenhum</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        <div className="flex items-center justify-center gap-3">
+                          {canEdit && (
+                            <>
+                              <button onClick={() => openEditModal(client)} className="text-blue-400 hover:text-blue-300 transition-colors" title="Editar">
+                                <Edit2 size={18} />
+                              </button>
+                              <button onClick={() => handleToggleBlock(client.id, client.isActive ?? true)} className={`${client.isActive ? 'text-orange-400 hover:text-orange-300' : 'text-emerald-400 hover:text-emerald-300'} transition-colors`} title={client.isActive ? 'Bloquear Cliente' : 'Desbloquear Cliente'}>
+                                {client.isActive ? <Ban size={18} /> : <ShieldCheck size={18} />}
+                              </button>
+                            </>
+                          )}
+                          {canDelete && (
+                            <button onClick={() => handleDelete(client.id)} className="text-red-500 hover:text-red-400 transition-colors" title="Excluir Definitivamente">
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -388,7 +444,7 @@ export default function ClientesPage() {
                 />
               </div>
 
-              <div className="pt-4 border-t border-zinc-800 flex gap-3">
+              <div className="pt-4 border-t border-zinc-800 flex flex-col md:flex-row gap-3">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-lg transition-colors">Cancelar</button>
                 <button type="submit" disabled={isSubmitting} className={`flex-1 py-3 font-bold rounded-lg transition-colors disabled:opacity-50 ${editingClient ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-[#FFD700] hover:bg-yellow-500 text-black'}`}>
                   {isSubmitting ? 'Salvando...' : 'Salvar Cliente'}

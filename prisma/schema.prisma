@@ -49,6 +49,8 @@ model User {
 
   barbershop Barbershop?  @relation(fields: [barbershopId], references: [id])
   services   ServiceLog[]
+  commissionRate Float?   @default(50)       // Porcentagem de comissão (Ex: 50%)
+  paymentCycle   String?  @default("WEEKLY") // Ciclo: DAILY, WEEKLY, BIWEEKLY, MONTHLY
 }
 
 // ==========================================
@@ -127,6 +129,7 @@ model ServiceLog {
   paymentMethod String
   status        String   @default("COMPLETED")
   date          DateTime @default(now())
+  isCommissionPaid Boolean @default(false) // NOVO: Controla se a comissão já foi paga ao barbeiro
 
   barbershop    Barbershop?  @relation(fields: [barbershopId], references: [id])
   user          User         @relation(fields: [userId], references: [id])
@@ -146,6 +149,10 @@ model FinancialRecord {
   date         DateTime @default(now())
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  status       String?   @default("PAID")    // "PAID" (Pago) ou "PENDING" (Pendente)
+  dueDate      DateTime? @default(now())     // Data de Vencimento
+  category     String?   @default("VARIAVEL")
+  paidAt       DateTime?  // NOVO: Data em que a conta foi efetivamente paga
 
   barbershop   Barbershop?  @relation(fields: [barbershopId], references: [id])
 }

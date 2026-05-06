@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation'; // NOVO: Importado para fazer o redirecionamento
 import { Scissors, User, Phone, Wallet, Plus, Trash2, CheckCircle2, AlertCircle, ShoppingCart } from 'lucide-react';
 
 interface ServiceType {
@@ -30,6 +31,8 @@ interface ClientType {
 }
 
 export default function LancamentoPage() {
+  const router = useRouter(); // NOVO: Hook de roteamento
+  
   const [catalog, setCatalog] = useState<ServiceType[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +100,7 @@ export default function LancamentoPage() {
 
   const addToCart = (service: ServiceType) => {
     setCart(prev => [...prev, { ...service, cartId: Math.random().toString(36).substring(7) }]);
+    showToast(`${service.name} adicionado!`, 'success'); // NOVO: Aviso de que o serviço foi clicado
   };
 
   const removeFromCart = (cartId: string) => {
@@ -152,23 +156,23 @@ export default function LancamentoPage() {
       });
 
       if (res.ok) {
-        showToast('Serviço lançado com sucesso!', 'success');
+        showToast('Serviço lançado! Redirecionando...', 'success'); // NOVO: Aviso de redirecionamento
         fetch('/api/clientes').then(r => r.json()).then(data => setClientsDb(data)).catch(() => {});
-        setCart([]);
-        setClientName('');
-        setClientPhone('');
-        setPaymentMethod('');
-        setDiscount('');
-        setSelectedClient(null); 
+        
+        // NOVO: Espera 1.5 segundos para a pessoa ler o aviso verde e manda pro Dashboard
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 1500);
+
       } else {
         const data = await res.json();
         showToast(data.message || 'Erro ao processar o lançamento.', 'error');
+        setIsSubmitting(false); // Só libera o botão se der erro
       }
     } catch (error) {
       showToast('Erro de conexão.', 'error');
-    } finally {
       setIsSubmitting(false);
-    }
+    } 
   };
 
   const filteredClients = clientsDb.filter(c => {
@@ -177,19 +181,13 @@ export default function LancamentoPage() {
 
     let isMatch = true;
 
-    // 1. Filtra pelo que foi digitado no campo de Nome
     if (searchName) {
-      // Tenta achar no nome
       const matchName = c.name.toLowerCase().includes(searchName);
-      
-      // Se você digitar números no campo de nome, ele tenta achar no telefone também!
       const nameAsPhone = clientName.replace(/\D/g, '');
       const matchPhone = nameAsPhone.length > 0 && c.phone ? c.phone.includes(nameAsPhone) : false;
-      
       isMatch = matchName || matchPhone;
     }
 
-    // 2. Se o campo de Telefone for preenchido, restringe a busca a ele também
     if (searchPhone && isMatch) {
       isMatch = c.phone ? c.phone.includes(searchPhone) : false;
     }
@@ -200,7 +198,7 @@ export default function LancamentoPage() {
   return (
     <div className="p-8 max-w-7xl mx-auto">
       {toast.show && (
-        <div className={`fixed top-5 right-5 z-50 px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 transition-all ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+        <div className={`fixed top-5 right-5 z-[100] px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 transition-all ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
           {toast.type === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
           <p className="font-bold">{toast.message}</p>
         </div>

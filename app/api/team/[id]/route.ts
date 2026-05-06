@@ -1,5 +1,3 @@
-// app/api/team/[id]/route.ts
-
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import jwt from 'jsonwebtoken';
@@ -31,7 +29,7 @@ export async function PUT(
         if (!barbershopId) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
 
         const body = await request.json();
-        const { name, email, password, isActive, permissions } = body;
+        const { name, email, password, isActive, permissions, commissionRate, paymentCycle } = body;
 
         if (!name || !email) return NextResponse.json({ message: 'Nome e e-mail são obrigatórios.' }, { status: 400 });
 
@@ -51,12 +49,16 @@ export async function PUT(
         const updateData: any = { name: name, email: normalizedEmail };
         if (password) updateData.password = await bcrypt.hash(password, 10);
         if (isActive !== undefined) updateData.isActive = isActive;
-        if (permissions !== undefined) updateData.permissions = permissions; // NOVO: Atualiza as permissões
+        if (permissions !== undefined) updateData.permissions = permissions;
+        
+        // NOVO: Atualiza comissão e ciclo
+        if (commissionRate !== undefined) updateData.commissionRate = Number(commissionRate);
+        if (paymentCycle !== undefined) updateData.paymentCycle = paymentCycle;
 
         const updatedBarber = await prisma.user.update({
             where: { id: id },
             data: updateData,
-            select: { id: true, name: true, email: true, isActive: true, permissions: true }
+            select: { id: true, name: true, email: true, isActive: true, permissions: true, commissionRate: true, paymentCycle: true }
         });
 
         return NextResponse.json(updatedBarber, { status: 200 });

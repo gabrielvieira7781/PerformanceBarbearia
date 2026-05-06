@@ -1,5 +1,3 @@
-// app/api/team/route.ts
-
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import jwt from 'jsonwebtoken';
@@ -33,7 +31,9 @@ export async function GET() {
                 email: true,
                 createdAt: true,
                 isActive: true,
-                permissions: true // NOVO: Traz as permissões
+                permissions: true,
+                commissionRate: true, // NOVO
+                paymentCycle: true    // NOVO
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
         if (!barbershopId) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
 
         const body = await request.json();
-        const { name, email, password, permissions } = body;
+        const { name, email, password, permissions, commissionRate, paymentCycle } = body;
 
         if (!name || !email || !password) {
             return NextResponse.json({ message: 'Nome, e-mail e senha são obrigatórios.' }, { status: 400 });
@@ -72,9 +72,11 @@ export async function POST(request: Request) {
                 isVerified: true,
                 isActive: true,
                 barbershopId: barbershopId,
-                permissions: permissions || [] // NOVO: Salva as permissões
+                permissions: permissions || [],
+                commissionRate: Number(commissionRate) || 50,
+                paymentCycle: paymentCycle || 'WEEKLY'
             },
-            select: { id: true, name: true, email: true, isActive: true, permissions: true }
+            select: { id: true, name: true, email: true, isActive: true, permissions: true, commissionRate: true, paymentCycle: true }
         });
 
         return NextResponse.json(newBarber, { status: 201 });
