@@ -102,7 +102,7 @@ export default function AdminDashboardLayout({
         {/* Rodapé da Sidebar */}
         <div className="p-4 border-t border-zinc-800 space-y-2">
           <Link 
-            href="/dashboard/servicos"
+            href="/dashboard/"
             className="flex items-center justify-center gap-2 px-4 py-3 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded transition-colors shadow-lg animate-pulse"
           >
             <PlayCircle size={20} />
