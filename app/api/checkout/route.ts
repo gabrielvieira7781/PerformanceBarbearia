@@ -1,5 +1,3 @@
-// app/api/checkout/route.ts
-
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import jwt from 'jsonwebtoken';
@@ -29,7 +27,8 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { clientName, clientPhone, cart, paymentMethod, discount, totalToPay } = body;
+        // RECEBENDO OS NOVOS DADOS DO PROGRAMA DE FIDELIDADE
+        const { clientName, clientPhone, cart, paymentMethod, discount, totalToPay, usedPoints, usedStampsReward } = body;
 
         if (!clientName || !cart || cart.length === 0 || !paymentMethod) {
             return NextResponse.json({ message: 'Dados incompletos para o checkout.' }, { status: 400 });
@@ -38,12 +37,20 @@ export async function POST(request: Request) {
         let cleanPhone = clientPhone ? clientPhone.replace(/\D/g, '') : '';
         let client = null;
 
+        // BUSCA O CLIENTE
         if (cleanPhone) {
             client = await prisma.client.findFirst({
                 where: { phone: cleanPhone, barbershopId: user.barbershopId }
             });
+
+            if (client && !client.isActive) {
+                return NextResponse.json({ 
+                    message: `O cliente ${client.name} possui este número, mas está BLOQUEADO no sistema. Atendimento não permitido.` 
+                }, { status: 403 }); 
+            }
         }
 
+        // CRIA UM NOVO SE NÃO EXISTIR
         if (!client) {
             client = await prisma.client.create({
                 data: {
@@ -54,7 +61,11 @@ export async function POST(request: Request) {
             });
         }
 
-        // Traz o cliente, o plano e quais serviços esse plano cobre
+        // Traz as configurações de Fidelidade da Barbearia
+        const settings = await prisma.barbershopSettings.findUnique({
+            where: { barbershopId: user.barbershopId }
+        });
+
         const clientWithPlan = await prisma.client.findUnique({
             where: { id: client.id },
             include: { plan: { include: { services: true } } }
@@ -64,18 +75,15 @@ export async function POST(request: Request) {
         const discountValue = Number(discount) || 0;
         let usedPlanCount = 0; 
 
-        // Registra os serviços avaliando o plano item a item
         const serviceLogsData = cart.map((item: any) => {
             let finalPrice = Number(item.price);
             let itemPaymentMethod = paymentMethod;
 
-            // Desconto manual genérico
             if (discountValue > 0 && subtotal > 0) {
                 const itemDiscount = (Number(item.price) / subtotal) * discountValue;
                 finalPrice = Math.max(0, finalPrice - itemDiscount);
             }
 
-            // O serviço está no plano? Tem saldo? Zera o valor!
             if (clientWithPlan?.plan) {
                 const isServiceInPlan = clientWithPlan.plan.services.some(s => s.id === item.id);
                 const currentUsage = clientWithPlan.cutsUsedThisMonth + usedPlanCount;
@@ -101,7 +109,6 @@ export async function POST(request: Request) {
 
         await prisma.serviceLog.createMany({ data: serviceLogsData });
 
-        // Atualiza a cota do plano no mês
         if (usedPlanCount > 0) {
             await prisma.client.update({
                 where: { id: client.id },
@@ -109,7 +116,6 @@ export async function POST(request: Request) {
             });
         }
 
-        // Só lança no financeiro se o cliente pagou algum dinheiro de fato (totalToPay > 0)
         if (totalToPay > 0) {
             const serviceNames = cart.map((i: any) => i.name).join(', ');
             await prisma.financialRecord.create({
@@ -118,6 +124,40 @@ export async function POST(request: Request) {
                     type: 'INCOME',
                     amount: totalToPay,
                     description: `Recebimento: ${serviceNames} - Cliente: ${client.name}`,
+                }
+            });
+        }
+
+        // =========================================================
+        // MÓDULO DE FIDELIDADE: CÁLCULO E ATUALIZAÇÃO DE PONTOS/SELOS
+        // =========================================================
+        let pointsEarned = 0;
+        let stampsEarned = 0;
+        let pointsToDeduct = Number(usedPoints) || 0;
+        
+        // Se resgatou o prêmio, nós deduzimos a quantidade exata de selos que custa o prêmio
+        let stampsToDeduct = 0;
+        if (usedStampsReward && settings?.stampsRequiredForReward) {
+            stampsToDeduct = settings.stampsRequiredForReward;
+        }
+
+        // Se a barbearia ativou os PONTOS, ganha pontos baseados no valor pago de fato
+        if (settings?.enablePointsLoyalty && totalToPay > 0) {
+            pointsEarned = Math.floor(totalToPay * (settings.pointsMultiplier || 1));
+        }
+        
+        // Se a barbearia ativou os SELOS, ganha 1 selo por cada serviço feito no carrinho
+        if (settings?.enableStampsLoyalty) {
+            stampsEarned = cart.length; 
+        }
+
+        // Se houve qualquer movimentação de saldo, atualiza o cliente no banco
+        if (pointsEarned > 0 || stampsEarned > 0 || pointsToDeduct > 0 || stampsToDeduct > 0) {
+            await prisma.client.update({
+                where: { id: client.id },
+                data: {
+                    loyaltyPoints: { increment: (pointsEarned - pointsToDeduct) },
+                    loyaltyStamps: { increment: (stampsEarned - stampsToDeduct) }
                 }
             });
         }

@@ -94,6 +94,9 @@ model Client {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  loyaltyPoints Float @default(0)
+  loyaltyStamps Int   @default(0)
+
   barbershop        Barbershop?  @relation(fields: [barbershopId], references: [id])
   services          ServiceLog[]
 }
@@ -155,4 +158,38 @@ model FinancialRecord {
   paidAt       DateTime?  // NOVO: Data em que a conta foi efetivamente paga
 
   barbershop   Barbershop?  @relation(fields: [barbershopId], references: [id])
+}
+
+// Configurações gerais da Barbearia
+model BarbershopSettings {
+  id                  String   @id @default(cuid())
+  barbershopId        String   @unique
+  allowBarberExpenses Boolean  @default(false) // O botão de liga/desliga
+
+  whatsappInstanceName String? 
+  whatsappApiKey       String? 
+  isWhatsappConnected  Boolean @default(false)
+  
+  // Fidelidade: Cashback (Pontos)
+  enablePointsLoyalty Boolean @default(false)
+  pointsMultiplier    Float   @default(1.0)  // Ganha quantos pontos a cada R$ 1? (Ex: 1)
+  pointsDiscountValue Float   @default(0.05) // Quanto vale cada ponto? (Ex: 0.05 = 5 centavos)
+
+  // Fidelidade: Cartão de Selos
+  enableStampsLoyalty     Boolean @default(false)
+  stampsRequiredForReward Int     @default(10) // Ex: A cada 10 cortes
+  stampRewardDescription  String  @default("1 Corte Grátis") // O que ele ganha
+  
+  updatedAt           DateTime @updatedAt
+}
+
+// Tabela exclusiva para os gastos pessoais do Barbeiro (não entra no DRE da barbearia)
+model BarberExpense {
+  id           String   @id @default(cuid())
+  userId       String   // ID do Barbeiro
+  barbershopId String   
+  amount       Float
+  description  String
+  date         DateTime @default(now())
+  createdAt    DateTime @default(now())
 }

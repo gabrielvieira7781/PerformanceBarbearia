@@ -1,8 +1,7 @@
-// app/dashboard/clientes/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Plus, Phone, CheckCircle2, AlertCircle, Link as LinkIcon, UserPlus, Edit2, Ban, Trash2, ShieldCheck, Crown } from 'lucide-react';
+import { Users, Search, Plus, Phone, CheckCircle2, AlertCircle, Link as LinkIcon, UserPlus, Edit2, Ban, Trash2, ShieldCheck, Crown, Star, Award } from 'lucide-react';
 
 interface Client {
   id: string;
@@ -15,6 +14,8 @@ interface Client {
   planId: string | null;
   plan: { id: string; name: string } | null;
   createdAt: string;
+  loyaltyPoints: number;
+  loyaltyStamps: number;
 }
 
 export default function ClientesPage() {
@@ -201,15 +202,17 @@ export default function ClientesPage() {
             <Users className="text-[#FFD700]" size={32} />
             Gestão de Clientes
           </h1>
-          <p className="text-zinc-400 mt-2 text-sm md:text-base">Visualize sua base, contatos, vínculos familiares e assinaturas.</p>
+          <p className="text-zinc-400 mt-2 text-sm md:text-base">Visualize sua base, contatos, vínculos, assinaturas e fidelidade.</p>
         </div>
-        <button 
-          onClick={openNewModal}
-          className="bg-[#FFD700] hover:bg-yellow-500 text-black font-bold px-6 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 w-full md:w-auto"
-        >
-          <UserPlus size={20} />
-          Novo Cliente
-        </button>
+        {canEdit && (
+          <button 
+            onClick={openNewModal}
+            className="bg-[#FFD700] hover:bg-yellow-500 text-black font-bold px-6 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 w-full md:w-auto"
+          >
+            <UserPlus size={20} />
+            Novo Cliente
+          </button>
+        )}
       </header>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
@@ -246,6 +249,11 @@ export default function ClientesPage() {
                     <div className="flex items-center gap-2 text-zinc-400 text-sm font-mono mt-1">
                       <Phone size={14} className="text-zinc-500" />
                       {client.phone ? client.phone.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3") : <span className="italic">Sem número</span>}
+                    </div>
+                    {/* Fidelidade Mobile */}
+                    <div className="flex gap-3 mt-3 bg-zinc-900/50 p-2 rounded border border-zinc-800">
+                      <span className="text-xs text-blue-400 font-bold flex items-center gap-1"><Star size={14}/> {client.loyaltyPoints} Pts</span>
+                      <span className="text-xs text-orange-400 font-bold flex items-center gap-1"><Award size={14}/> {client.loyaltyStamps} Selos</span>
                     </div>
                   </div>
 
@@ -295,7 +303,8 @@ export default function ClientesPage() {
                   <tr className="text-zinc-400 text-sm font-bold uppercase tracking-wider">
                     <th className="py-4 px-6">Nome do Cliente</th>
                     <th className="py-4 px-6">Contato</th>
-                    <th className="py-4 px-6">Clube / Plano VIP</th>
+                    <th className="py-4 px-6">Fidelidade</th>
+                    <th className="py-4 px-6">Clube VIP</th>
                     <th className="py-4 px-6">Vínculos</th>
                     <th className="py-4 px-6 text-center">Ações</th>
                   </tr>
@@ -319,6 +328,17 @@ export default function ClientesPage() {
                         ) : (
                           <span className="text-zinc-600 italic">Sem número próprio</span>
                         )}
+                      </td>
+                      {/* NOVA COLUNA FIDELIDADE */}
+                      <td className="py-4 px-6">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[11px] text-blue-400 font-bold flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded w-max border border-blue-500/20">
+                            <Star size={12}/> {client.loyaltyPoints} Pts
+                          </span>
+                          <span className="text-[11px] text-orange-400 font-bold flex items-center gap-1 bg-orange-500/10 px-2 py-0.5 rounded w-max border border-orange-500/20">
+                            <Award size={12}/> {client.loyaltyStamps} Selos
+                          </span>
+                        </div>
                       </td>
                       <td className="py-4 px-6">
                         {client.plan ? (

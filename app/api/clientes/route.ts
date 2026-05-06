@@ -1,5 +1,3 @@
-// app/api/clientes/route.ts
-
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import jwt from 'jsonwebtoken';
@@ -34,7 +32,7 @@ export async function GET() {
                         id: true, 
                         name: true, 
                         maxCuts: true,
-                        services: { select: { id: true, name: true } } // NOVO: Traz os serviços do plano
+                        services: { select: { id: true, name: true } }
                     } 
                 }
             },
@@ -62,11 +60,21 @@ export async function POST(request: Request) {
         let cleanPhone = '';
         if (phone) {
             cleanPhone = phone.replace(/\D/g, '');
+            
+            // CORREÇÃO AQUI: Procura se existe QUALQUER cliente com esse número, ativo ou não.
             const existingClient = await prisma.client.findFirst({
                 where: { barbershopId, phone: cleanPhone }
             });
 
             if (existingClient) {
+                // Se existir e estiver bloqueado, avisa o bloqueio
+                if (!existingClient.isActive) {
+                    return NextResponse.json({ 
+                        message: `O cliente ${existingClient.name} possui este WhatsApp e encontra-se BLOQUEADO no sistema. Desbloqueie-o antes de tentar novo cadastro.` 
+                    }, { status: 400 });
+                }
+                
+                // Se existir e estiver ativo, avisa a duplicação
                 return NextResponse.json({ 
                     message: `Este WhatsApp já está cadastrado para: ${existingClient.name}` 
                 }, { status: 400 });

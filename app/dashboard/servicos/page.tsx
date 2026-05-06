@@ -2,8 +2,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation'; // NOVO: Importado para fazer o redirecionamento
-import { Scissors, User, Phone, Wallet, Plus, Trash2, CheckCircle2, AlertCircle, ShoppingCart } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Scissors, User, Phone, Wallet, Plus, Trash2, CheckCircle2, AlertCircle, ShoppingCart, Star, Award, Gift } from 'lucide-react';
 
 interface ServiceType {
   id: string;
@@ -28,16 +28,27 @@ interface ClientType {
   } | null;
   cutsUsedThisMonth?: number;
   planExpiresAt?: string | null;
+  loyaltyPoints?: number;
+  loyaltyStamps?: number;
+}
+
+interface SettingsType {
+  enablePointsLoyalty: boolean;
+  pointsDiscountValue: number;
+  enableStampsLoyalty: boolean;
+  stampsRequiredForReward: number;
+  stampRewardDescription: string;
 }
 
 export default function LancamentoPage() {
-  const router = useRouter(); // NOVO: Hook de roteamento
+  const router = useRouter(); 
   
   const [catalog, setCatalog] = useState<ServiceType[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [clientsDb, setClientsDb] = useState<ClientType[]>([]);
+  const [settings, setSettings] = useState<SettingsType | null>(null); // NOVO: Guarda as config de fidelidade
   const [showClientList, setShowClientList] = useState(false);
   
   const [selectedClient, setSelectedClient] = useState<ClientType | null>(null);
@@ -45,6 +56,10 @@ export default function LancamentoPage() {
   const [clientPhone, setClientPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [discount, setDiscount] = useState('');
+
+  // NOVO: Estados para os toggles de fidelidade
+  const [usePoints, setUsePoints] = useState(false);
+  const [useStampReward, setUseStampReward] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -62,6 +77,10 @@ export default function LancamentoPage() {
         
         const resClients = await fetch('/api/clientes');
         if (resClients.ok) setClientsDb(await resClients.json());
+
+        const resSettings = await fetch('/api/configuracoes');
+        if (resSettings.ok) setSettings(await resSettings.json());
+
       } catch (err) {
         console.error("Erro ao buscar dados iniciais", err);
       } finally {
@@ -71,7 +90,7 @@ export default function LancamentoPage() {
     fetchData();
   }, []);
 
-  // AUTO-SELECT INTELIGENTE: Puxa o plano se o barbeiro só digitar o nome
+  // AUTO-SELECT INTELIGENTE
   useEffect(() => {
     if (clientName.length > 2 && !selectedClient) {
       const match = clientsDb.find(c => c.name.toLowerCase() === clientName.toLowerCase().trim());
@@ -96,18 +115,23 @@ export default function LancamentoPage() {
     setClientPhone(client.phone || '');
     setSelectedClient(client); 
     setShowClientList(false);
+    // Zera os toggles ao trocar de cliente
+    setUsePoints(false);
+    setUseStampReward(false);
   };
 
   const addToCart = (service: ServiceType) => {
     setCart(prev => [...prev, { ...service, cartId: Math.random().toString(36).substring(7) }]);
-    showToast(`${service.name} adicionado!`, 'success'); // NOVO: Aviso de que o serviço foi clicado
+    showToast(`${service.name} adicionado!`, 'success'); 
   };
 
   const removeFromCart = (cartId: string) => {
     setCart(prev => prev.filter(item => item.cartId !== cartId));
   };
 
-  // CÁLCULO MÁGICO DO PLANO EM TEMPO REAL
+  // ==========================================
+  // CÁLCULOS: PLANO VIP + DESCONTOS + PONTOS
+  // ==========================================
   const remainingPlanCuts = selectedClient?.plan ? (selectedClient.plan.maxCuts - (selectedClient.cutsUsedThisMonth || 0)) : 0;
   let tempRemainingCuts = remainingPlanCuts;
   
@@ -123,7 +147,19 @@ export default function LancamentoPage() {
 
   const subtotal = calculatedCart.reduce((acc, item) => acc + item.finalPrice, 0);
   const discountValue = Number(discount) || 0;
-  const total = Math.max(0, subtotal - discountValue);
+  
+  // Lógica dos Pontos de Fidelidade
+  const availablePoints = selectedClient?.loyaltyPoints || 0;
+  const ptsValue = settings?.pointsDiscountValue || 0;
+  const maxPointsDiscount = availablePoints * ptsValue;
+  
+  const subtotalAfterManualDiscount = Math.max(0, subtotal - discountValue);
+  
+  // O desconto de pontos não pode deixar a conta negativa
+  const actualPointsDiscount = usePoints ? Math.min(maxPointsDiscount, subtotalAfterManualDiscount) : 0;
+  const actualPointsUsed = ptsValue > 0 ? (actualPointsDiscount / ptsValue) : 0;
+
+  const total = Math.max(0, subtotalAfterManualDiscount - actualPointsDiscount);
 
   // Auto seleciona pagamento via plano se o total zerar
   useEffect(() => {
@@ -151,15 +187,17 @@ export default function LancamentoPage() {
           cart,
           paymentMethod,
           discount: discountValue,
-          totalToPay: total
+          totalToPay: total,
+          // NOVO: Envia para a API quantos pontos/selos o barbeiro ativou
+          usedPoints: actualPointsUsed,
+          usedStampsReward: useStampReward
         })
       });
 
       if (res.ok) {
-        showToast('Serviço lançado! Redirecionando...', 'success'); // NOVO: Aviso de redirecionamento
+        showToast('Serviço lançado! Redirecionando...', 'success'); 
         fetch('/api/clientes').then(r => r.json()).then(data => setClientsDb(data)).catch(() => {});
         
-        // NOVO: Espera 1.5 segundos para a pessoa ler o aviso verde e manda pro Dashboard
         setTimeout(() => {
           router.push('/dashboard');
         }, 1500);
@@ -167,7 +205,7 @@ export default function LancamentoPage() {
       } else {
         const data = await res.json();
         showToast(data.message || 'Erro ao processar o lançamento.', 'error');
-        setIsSubmitting(false); // Só libera o botão se der erro
+        setIsSubmitting(false); 
       }
     } catch (error) {
       showToast('Erro de conexão.', 'error');
@@ -194,6 +232,10 @@ export default function LancamentoPage() {
 
     return isMatch;
   });
+
+  // Verificadores de Fidelidade Visual
+  const canUseStamps = selectedClient && settings?.enableStampsLoyalty && ((selectedClient.loyaltyStamps || 0) >= (settings?.stampsRequiredForReward || 9999));
+  const hasPoints = selectedClient && settings?.enablePointsLoyalty && ((selectedClient.loyaltyPoints || 0) > 0);
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -266,6 +308,8 @@ export default function LancamentoPage() {
                       setClientName(e.target.value);
                       if (selectedClient && selectedClient.name.toLowerCase() !== e.target.value.toLowerCase()) {
                         setSelectedClient(null); 
+                        setUsePoints(false);
+                        setUseStampReward(false);
                       }
                       setShowClientList(true);
                     }}
@@ -324,6 +368,34 @@ export default function LancamentoPage() {
                   )}
                 </div>
               )}
+
+              {/* MÓDULO DE FIDELIDADE (SÓ APARECE SE O CLIENTE EXISTIR E TIVER ALGO) */}
+              {(hasPoints || canUseStamps) && (
+                <div className="mt-4 space-y-2 animation-scale-up">
+                  <p className="text-xs font-bold text-zinc-500 uppercase">Fidelidade Disponível</p>
+                  
+                  {hasPoints && (
+                    <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${usePoints ? 'bg-blue-500/10 border-blue-500/50' : 'bg-black border-zinc-800 hover:border-zinc-700'}`}>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-blue-400 flex items-center gap-1"><Star size={14}/> Usar {selectedClient.loyaltyPoints} Pontos</span>
+                        <span className="text-[10px] text-zinc-400">Valem {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(maxPointsDiscount)} de desconto</span>
+                      </div>
+                      <input type="checkbox" checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)} className="accent-blue-500 w-4 h-4" />
+                    </label>
+                  )}
+
+                  {canUseStamps && (
+                    <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${useStampReward ? 'bg-orange-500/10 border-orange-500/50' : 'bg-black border-zinc-800 hover:border-zinc-700'}`}>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-orange-400 flex items-center gap-1"><Gift size={14}/> Resgatar Prêmio!</span>
+                        <span className="text-[10px] text-zinc-400">Prêmio: {settings?.stampRewardDescription}</span>
+                      </div>
+                      <input type="checkbox" checked={useStampReward} onChange={(e) => setUseStampReward(e.target.checked)} className="accent-orange-500 w-4 h-4" />
+                    </label>
+                  )}
+                </div>
+              )}
+
             </div>
 
             <div className="mb-6 min-h-[120px] max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
@@ -400,8 +472,20 @@ export default function LancamentoPage() {
                 </div>
                 {discountValue > 0 && (
                   <div className="flex justify-between text-sm text-red-400 mb-2">
-                    <span>Desconto</span>
+                    <span>Desconto Manual</span>
                     <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountValue)}</span>
+                  </div>
+                )}
+                {actualPointsDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-blue-400 mb-2">
+                    <span>Desconto ({Math.floor(actualPointsUsed)} pts)</span>
+                    <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(actualPointsDiscount)}</span>
+                  </div>
+                )}
+                {useStampReward && (
+                  <div className="flex justify-between text-[11px] text-orange-400 mb-2 font-bold uppercase tracking-wider">
+                    <span>Prêmio Resgatado!</span>
+                    <span>{settings?.stampRewardDescription}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center text-lg font-bold text-[#FFD700] pt-2 border-t border-zinc-800/50 mt-2">

@@ -26,14 +26,17 @@ export default function EquipePage() {
   const [team, setTeam] = useState<Barber[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Controle de Permissão na Tela
+  const [canManageTeam, setCanManageTeam] = useState(false);
+  
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [permissions, setPermissions] = useState<string[]>([]);
-  const [commissionRate, setCommissionRate] = useState('50'); // Padrão 50%
-  const [paymentCycle, setPaymentCycle] = useState('WEEKLY'); // Padrão Semanal
+  const [commissionRate, setCommissionRate] = useState('50');
+  const [paymentCycle, setPaymentCycle] = useState('WEEKLY');
   
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -51,6 +54,22 @@ export default function EquipePage() {
   };
 
   useEffect(() => {
+    const checkPermissions = () => {
+      const roleMatch = document.cookie.match(new RegExp('(^| )user_role=([^;]+)'));
+      const permsMatch = document.cookie.match(new RegExp('(^| )user_permissions=([^;]+)'));
+      
+      const role = roleMatch ? roleMatch[2] : '';
+      let userPerms: string[] = [];
+      try { 
+        if (permsMatch) userPerms = JSON.parse(decodeURIComponent(permsMatch[2])); 
+      } catch (e) {}
+
+      if (role === 'ADMIN' || userPerms.includes('admin_panel')) {
+        setCanManageTeam(true);
+      }
+    };
+
+    checkPermissions();
     fetchTeam();
   }, []);
 
@@ -89,6 +108,7 @@ export default function EquipePage() {
   };
 
   const handleToggleStatus = async (barber: Barber) => {
+    if (!canManageTeam) return;
     setError('');
     setSuccess('');
     const newStatus = !barber.isActive;
@@ -201,110 +221,111 @@ export default function EquipePage() {
           Gestão de Equipe e Comissões
         </h1>
         <p className="text-zinc-400 mt-2 text-sm md:text-base">
-          Cadastre os profissionais, defina os acessos e configure as regras de pagamento.
+          {canManageTeam ? 'Cadastre os profissionais, defina os acessos e configure as regras de pagamento.' : 'Visualize a equipe da barbearia.'}
         </p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Formulário */}
-        <div className="lg:col-span-1">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 md:sticky top-6">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              {editingId ? (
-                <><Pencil className="text-[#FFD700]" size={20} /> Editar Barbeiro</>
-              ) : (
-                <><Plus className="text-[#FFD700]" size={20} /> Novo Barbeiro</>
-              )}
-            </h2>
+        {/* Formulário APENAS se tiver permissão */}
+        {canManageTeam && (
+          <div className="lg:col-span-1">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 md:sticky top-6">
+              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                {editingId ? (
+                  <><Pencil className="text-[#FFD700]" size={20} /> Editar Barbeiro</>
+                ) : (
+                  <><Plus className="text-[#FFD700]" size={20} /> Novo Barbeiro</>
+                )}
+              </h2>
 
-            {error && <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm">{error}</div>}
-            {success && <div className="bg-green-500/10 border border-green-500 text-green-500 p-3 rounded mb-4 text-sm">{success}</div>}
+              {error && <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm">{error}</div>}
+              {success && <div className="bg-green-500/10 border border-green-500 text-green-500 p-3 rounded mb-4 text-sm">{success}</div>}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">Nome Completo *</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors" placeholder="Nome do profissional" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">E-mail de Login *</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors" placeholder="email@exemplo.com" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">
-                  {editingId ? 'Nova Senha (Opcional)' : 'Senha de Acesso *'}
-                </label>
-                <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors" placeholder={editingId ? 'Deixe em branco para manter a atual' : 'Crie uma senha inicial'} />
-              </div>
-
-              {/* REGRAS DE COMISSÃO E PAGAMENTO */}
-              <div className="pt-2 border-t border-zinc-800 mt-4 flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-[#FFD700] mb-1 flex items-center gap-1">
-                    <Percent size={14} /> Comissão (%) *
-                  </label>
-                  <input type="number" step="0.1" value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700]" placeholder="Ex: 50" />
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">Nome Completo *</label>
+                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors" placeholder="Nome do profissional" />
                 </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-[#FFD700] mb-1 flex items-center gap-1">
-                    <CalendarClock size={14} /> Acerto *
-                  </label>
-                  <select value={paymentCycle} onChange={(e) => setPaymentCycle(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] appearance-none">
-                    <option value="DAILY">Diário</option>
-                    <option value="WEEKLY">Semanal</option>
-                    <option value="BIWEEKLY">Quinzenal</option>
-                    <option value="MONTHLY">Mensal</option>
-                  </select>
-                </div>
-              </div>
 
-              <div className="pt-2 border-t border-zinc-800 mt-4">
-                <label className="block text-sm font-medium text-[#FFD700] mb-3 flex items-center gap-2">
-                  <Shield size={16} /> Permissões de Acesso
-                </label>
-                <div className="space-y-2 bg-black p-3 rounded border border-zinc-800 max-h-40 overflow-y-auto custom-scrollbar">
-                  {AVAILABLE_PERMISSIONS.map(perm => (
-                    <label key={perm.id} className="flex items-center gap-2 text-zinc-300 text-sm cursor-pointer hover:text-white transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={permissions.includes(perm.id)}
-                        onChange={() => togglePermission(perm.id)}
-                        className="accent-[#FFD700] w-4 h-4 cursor-pointer"
-                      />
-                      {perm.label}
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">E-mail de Login *</label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors" placeholder="email@exemplo.com" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    {editingId ? 'Nova Senha (Opcional)' : 'Senha de Acesso *'}
+                  </label>
+                  <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors" placeholder={editingId ? 'Deixe em branco para manter a atual' : 'Crie uma senha inicial'} />
+                </div>
+
+                <div className="pt-2 border-t border-zinc-800 mt-4 flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-[#FFD700] mb-1 flex items-center gap-1">
+                      <Percent size={14} /> Comissão (%) *
                     </label>
-                  ))}
-                </div>
-              </div>
-
-              {editingId && (
-                <div className="flex items-center gap-3 py-2 border-t border-zinc-800">
-                  <div onClick={() => setIsActive(!isActive)} className="w-11 h-6 rounded-full cursor-pointer relative flex items-center px-0.5 transition-colors duration-300" style={{ backgroundColor: isActive ? '#22c55e' : '#3f3f46' }}>
-                    <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${isActive ? 'translate-x-5' : 'translate-x-0'}`} />
+                    <input type="number" step="0.1" value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700]" placeholder="Ex: 50" />
                   </div>
-                  <span className="text-sm font-medium text-zinc-300">{isActive ? 'Acesso Liberado' : 'Acesso Bloqueado'}</span>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-[#FFD700] mb-1 flex items-center gap-1">
+                      <CalendarClock size={14} /> Acerto *
+                    </label>
+                    <select value={paymentCycle} onChange={(e) => setPaymentCycle(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] appearance-none">
+                      <option value="DAILY">Diário</option>
+                      <option value="WEEKLY">Semanal</option>
+                      <option value="BIWEEKLY">Quinzenal</option>
+                      <option value="MONTHLY">Mensal</option>
+                    </select>
+                  </div>
                 </div>
-              )}
 
-              <div className="pt-2 flex flex-col gap-2">
-                <button type="submit" disabled={isSubmitting} className="w-full bg-[#FFD700] text-black font-bold rounded px-4 py-3 hover:bg-yellow-500 transition-colors disabled:opacity-50">
-                  {isSubmitting ? 'Salvando...' : (editingId ? 'Atualizar Dados' : 'Cadastrar Barbeiro')}
-                </button>
+                <div className="pt-2 border-t border-zinc-800 mt-4">
+                  <label className="block text-sm font-medium text-[#FFD700] mb-3 flex items-center gap-2">
+                    <Shield size={16} /> Permissões de Acesso
+                  </label>
+                  <div className="space-y-2 bg-black p-3 rounded border border-zinc-800 max-h-40 overflow-y-auto custom-scrollbar">
+                    {AVAILABLE_PERMISSIONS.map(perm => (
+                      <label key={perm.id} className="flex items-center gap-2 text-zinc-300 text-sm cursor-pointer hover:text-white transition-colors">
+                        <input 
+                          type="checkbox" 
+                          checked={permissions.includes(perm.id)}
+                          onChange={() => togglePermission(perm.id)}
+                          className="accent-[#FFD700] w-4 h-4 cursor-pointer"
+                        />
+                        {perm.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
                 {editingId && (
-                  <button type="button" onClick={handleCancelEdit} className="w-full bg-transparent border border-zinc-700 text-white font-bold rounded px-4 py-3 hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2">
-                    <X size={18} /> Cancelar
-                  </button>
+                  <div className="flex items-center gap-3 py-2 border-t border-zinc-800">
+                    <div onClick={() => setIsActive(!isActive)} className="w-11 h-6 rounded-full cursor-pointer relative flex items-center px-0.5 transition-colors duration-300" style={{ backgroundColor: isActive ? '#22c55e' : '#3f3f46' }}>
+                      <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${isActive ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-300">{isActive ? 'Acesso Liberado' : 'Acesso Bloqueado'}</span>
+                  </div>
                 )}
-              </div>
-            </form>
-          </div>
-        </div>
 
-        {/* Lista de Equipe */}
-        <div className="lg:col-span-2">
+                <div className="pt-2 flex flex-col gap-2">
+                  <button type="submit" disabled={isSubmitting} className="w-full bg-[#FFD700] text-black font-bold rounded px-4 py-3 hover:bg-yellow-500 transition-colors disabled:opacity-50">
+                    {isSubmitting ? 'Salvando...' : (editingId ? 'Atualizar Dados' : 'Cadastrar Barbeiro')}
+                  </button>
+
+                  {editingId && (
+                    <button type="button" onClick={handleCancelEdit} className="w-full bg-transparent border border-zinc-700 text-white font-bold rounded px-4 py-3 hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2">
+                      <X size={18} /> Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Lista de Equipe - Expande se não tiver formulário */}
+        <div className={canManageTeam ? "lg:col-span-2" : "lg:col-span-3"}>
           <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <Users className="text-[#FFD700]" size={20} />
@@ -341,19 +362,21 @@ export default function EquipePage() {
                       <div className="flex items-center justify-between border-t border-zinc-800/50 pt-3">
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-zinc-500 font-bold uppercase">Status:</span>
-                          <div onClick={() => handleToggleStatus(barber)} className="w-11 h-6 rounded-full cursor-pointer relative flex items-center px-0.5 transition-colors duration-300" style={{ backgroundColor: barber.isActive ? '#22c55e' : '#3f3f46' }}>
+                          <div onClick={() => handleToggleStatus(barber)} className={`w-11 h-6 rounded-full relative flex items-center px-0.5 transition-colors duration-300 ${canManageTeam ? 'cursor-pointer' : 'cursor-default'}`} style={{ backgroundColor: barber.isActive ? '#22c55e' : '#3f3f46' }}>
                             <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${barber.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => handleEditClick(barber)} className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded transition-colors" title="Editar">
-                            <KeyRound size={16} />
-                          </button>
-                          <button onClick={() => handleDeleteClick(barber.id)} className="p-2 bg-zinc-800 hover:bg-red-500/20 text-red-500 rounded transition-colors" title="Excluir">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                        {canManageTeam && (
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleEditClick(barber)} className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded transition-colors" title="Editar">
+                              <KeyRound size={16} />
+                            </button>
+                            <button onClick={() => handleDeleteClick(barber.id)} className="p-2 bg-zinc-800 hover:bg-red-500/20 text-red-500 rounded transition-colors" title="Excluir">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -367,7 +390,7 @@ export default function EquipePage() {
                         <th className="py-3 px-4 text-zinc-400 font-medium">Nome do Profissional</th>
                         <th className="py-3 px-4 text-zinc-400 font-medium text-center">Acerto</th>
                         <th className="py-3 px-4 text-zinc-400 font-medium text-center">Status</th>
-                        <th className="py-3 px-4 text-zinc-400 font-medium text-center w-28">Ações</th>
+                        {canManageTeam && <th className="py-3 px-4 text-zinc-400 font-medium text-center w-28">Ações</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -392,22 +415,24 @@ export default function EquipePage() {
 
                           <td className="py-4 px-4">
                             <div className="flex justify-center">
-                              <div onClick={() => handleToggleStatus(barber)} title={barber.isActive ? "Bloquear acesso" : "Liberar acesso"} className="w-11 h-6 rounded-full cursor-pointer relative flex items-center px-0.5 transition-colors duration-300" style={{ backgroundColor: barber.isActive ? '#22c55e' : '#3f3f46' }}>
+                              <div onClick={() => handleToggleStatus(barber)} title={barber.isActive ? "Acesso liberado" : "Acesso bloqueado"} className={`w-11 h-6 rounded-full relative flex items-center px-0.5 transition-colors duration-300 ${canManageTeam ? 'cursor-pointer' : 'cursor-default'}`} style={{ backgroundColor: barber.isActive ? '#22c55e' : '#3f3f46' }}>
                                 <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${barber.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
                               </div>
                             </div>
                           </td>
 
-                          <td className="py-4 px-4">
-                            <div className="flex items-center justify-center gap-2">
-                              <button onClick={() => handleEditClick(barber)} className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded transition-colors" title="Editar">
-                                <KeyRound size={16} />
-                              </button>
-                              <button onClick={() => handleDeleteClick(barber.id)} className="p-2 bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-500 rounded transition-colors" title="Remover">
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
+                          {canManageTeam && (
+                            <td className="py-4 px-4">
+                              <div className="flex items-center justify-center gap-2">
+                                <button onClick={() => handleEditClick(barber)} className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded transition-colors" title="Editar">
+                                  <KeyRound size={16} />
+                                </button>
+                                <button onClick={() => handleDeleteClick(barber.id)} className="p-2 bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-500 rounded transition-colors" title="Remover">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
