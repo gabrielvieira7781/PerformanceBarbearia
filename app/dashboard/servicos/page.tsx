@@ -1,18 +1,19 @@
-// app/dashboard/servicos/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Scissors, User, Phone, Wallet, Plus, Trash2, CheckCircle2, AlertCircle, ShoppingCart, Star, Award, Gift } from 'lucide-react';
+import { Scissors, User, Phone, Wallet, Plus, Trash2, CheckCircle2, AlertCircle, ShoppingCart, Star, Award, Gift, Package } from 'lucide-react';
 
-interface ServiceType {
+interface ItemType {
   id: string;
   name: string;
   price: number;
   isActive: boolean;
+  type: 'SERVICE' | 'PRODUCT';
+  stock?: number;
 }
 
-interface CartItem extends ServiceType {
+interface CartItem extends ItemType {
   cartId: string;
 }
 
@@ -43,12 +44,15 @@ interface SettingsType {
 export default function LancamentoPage() {
   const router = useRouter(); 
   
-  const [catalog, setCatalog] = useState<ServiceType[]>([]);
+  const [activeTab, setActiveTab] = useState<'SERVICOS' | 'PRODUTOS'>('SERVICOS');
+  
+  const [servicesCatalog, setServicesCatalog] = useState<ItemType[]>([]);
+  const [productsCatalog, setProductsCatalog] = useState<ItemType[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [clientsDb, setClientsDb] = useState<ClientType[]>([]);
-  const [settings, setSettings] = useState<SettingsType | null>(null); // NOVO: Guarda as config de fidelidade
+  const [settings, setSettings] = useState<SettingsType | null>(null); 
   const [showClientList, setShowClientList] = useState(false);
   
   const [selectedClient, setSelectedClient] = useState<ClientType | null>(null);
@@ -57,7 +61,6 @@ export default function LancamentoPage() {
   const [paymentMethod, setPaymentMethod] = useState('');
   const [discount, setDiscount] = useState('');
 
-  // NOVO: Estados para os toggles de fidelidade
   const [usePoints, setUsePoints] = useState(false);
   const [useStampReward, setUseStampReward] = useState(false);
 
@@ -72,13 +75,24 @@ export default function LancamentoPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const resServices = await fetch('/api/services');
-        if (resServices.ok) setCatalog((await resServices.json()).filter((s: ServiceType) => s.isActive));
-        
-        const resClients = await fetch('/api/clientes');
-        if (resClients.ok) setClientsDb(await resClients.json());
+        const [resServices, resProducts, resClients, resSettings] = await Promise.all([
+          fetch('/api/services'),
+          fetch('/api/produtos'),
+          fetch('/api/clientes'),
+          fetch('/api/configuracoes')
+        ]);
 
-        const resSettings = await fetch('/api/configuracoes');
+        if (resServices.ok) {
+          const data = await resServices.json();
+          setServicesCatalog(data.filter((s: any) => s.isActive).map((s: any) => ({ ...s, type: 'SERVICE' })));
+        }
+
+        if (resProducts.ok) {
+          const data = await resProducts.json();
+          setProductsCatalog(data.filter((p: any) => p.isActive).map((p: any) => ({ ...p, type: 'PRODUCT' })));
+        }
+
+        if (resClients.ok) setClientsDb(await resClients.json());
         if (resSettings.ok) setSettings(await resSettings.json());
 
       } catch (err) {
@@ -90,7 +104,6 @@ export default function LancamentoPage() {
     fetchData();
   }, []);
 
-  // AUTO-SELECT INTELIGENTE
   useEffect(() => {
     if (clientName.length > 2 && !selectedClient) {
       const match = clientsDb.find(c => c.name.toLowerCase() === clientName.toLowerCase().trim());
@@ -115,28 +128,34 @@ export default function LancamentoPage() {
     setClientPhone(client.phone || '');
     setSelectedClient(client); 
     setShowClientList(false);
-    // Zera os toggles ao trocar de cliente
     setUsePoints(false);
     setUseStampReward(false);
   };
 
-  const addToCart = (service: ServiceType) => {
-    setCart(prev => [...prev, { ...service, cartId: Math.random().toString(36).substring(7) }]);
-    showToast(`${service.name} adicionado!`, 'success'); 
+  const addToCart = (item: ItemType) => {
+    // Validação de Estoque
+    if (item.type === 'PRODUCT') {
+      const countInCart = cart.filter(c => c.id === item.id).length;
+      if (item.stock !== undefined && countInCart >= item.stock) {
+        return showToast(`Estoque insuficiente! Apenas ${item.stock} disponíveis.`, 'error');
+      }
+    }
+
+    setCart(prev => [...prev, { ...item, cartId: Math.random().toString(36).substring(7) }]);
+    showToast(`${item.name} adicionado!`, 'success'); 
   };
 
   const removeFromCart = (cartId: string) => {
     setCart(prev => prev.filter(item => item.cartId !== cartId));
   };
 
-  // ==========================================
-  // CÁLCULOS: PLANO VIP + DESCONTOS + PONTOS
-  // ==========================================
+  // CÁLCULOS
   const remainingPlanCuts = selectedClient?.plan ? (selectedClient.plan.maxCuts - (selectedClient.cutsUsedThisMonth || 0)) : 0;
   let tempRemainingCuts = remainingPlanCuts;
   
   const calculatedCart = cart.map(item => {
-    const isCovered = selectedClient?.plan?.services?.some(s => s.id === item.id);
+    // Plano VIP SÓ se aplica a Serviços, não a produtos!
+    const isCovered = item.type === 'SERVICE' && selectedClient?.plan?.services?.some(s => s.id === item.id);
     
     if (isCovered && tempRemainingCuts > 0) {
       tempRemainingCuts--; 
@@ -148,20 +167,17 @@ export default function LancamentoPage() {
   const subtotal = calculatedCart.reduce((acc, item) => acc + item.finalPrice, 0);
   const discountValue = Number(discount) || 0;
   
-  // Lógica dos Pontos de Fidelidade
   const availablePoints = selectedClient?.loyaltyPoints || 0;
   const ptsValue = settings?.pointsDiscountValue || 0;
   const maxPointsDiscount = availablePoints * ptsValue;
   
   const subtotalAfterManualDiscount = Math.max(0, subtotal - discountValue);
   
-  // O desconto de pontos não pode deixar a conta negativa
   const actualPointsDiscount = usePoints ? Math.min(maxPointsDiscount, subtotalAfterManualDiscount) : 0;
   const actualPointsUsed = ptsValue > 0 ? (actualPointsDiscount / ptsValue) : 0;
 
   const total = Math.max(0, subtotalAfterManualDiscount - actualPointsDiscount);
 
-  // Auto seleciona pagamento via plano se o total zerar
   useEffect(() => {
     if (cart.length > 0 && total === 0 && paymentMethod !== 'Plano') {
       setPaymentMethod('Plano');
@@ -170,7 +186,7 @@ export default function LancamentoPage() {
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cart.length === 0) return showToast('Adicione pelo menos um serviço ao carrinho.', 'error');
+    if (cart.length === 0) return showToast('Adicione pelo menos um item ao carrinho.', 'error');
     if (!clientName) return showToast('O nome do cliente é obrigatório.', 'error');
     if (!paymentMethod) return showToast('Selecione a forma de pagamento.', 'error');
 
@@ -184,24 +200,18 @@ export default function LancamentoPage() {
         body: JSON.stringify({
           clientName,
           clientPhone: cleanPhone,
-          cart,
+          cart, // Vai com 'type: PRODUCT ou SERVICE'
           paymentMethod,
           discount: discountValue,
           totalToPay: total,
-          // NOVO: Envia para a API quantos pontos/selos o barbeiro ativou
           usedPoints: actualPointsUsed,
           usedStampsReward: useStampReward
         })
       });
 
       if (res.ok) {
-        showToast('Serviço lançado! Redirecionando...', 'success'); 
-        fetch('/api/clientes').then(r => r.json()).then(data => setClientsDb(data)).catch(() => {});
-        
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 1500);
-
+        showToast('Lançamento concluído! Redirecionando...', 'success'); 
+        setTimeout(() => router.push('/dashboard'), 1500);
       } else {
         const data = await res.json();
         showToast(data.message || 'Erro ao processar o lançamento.', 'error');
@@ -216,7 +226,6 @@ export default function LancamentoPage() {
   const filteredClients = clientsDb.filter(c => {
     const searchName = clientName.toLowerCase();
     const searchPhone = clientPhone.replace(/\D/g, '');
-
     let isMatch = true;
 
     if (searchName) {
@@ -225,15 +234,12 @@ export default function LancamentoPage() {
       const matchPhone = nameAsPhone.length > 0 && c.phone ? c.phone.includes(nameAsPhone) : false;
       isMatch = matchName || matchPhone;
     }
-
     if (searchPhone && isMatch) {
       isMatch = c.phone ? c.phone.includes(searchPhone) : false;
     }
-
     return isMatch;
   });
 
-  // Verificadores de Fidelidade Visual
   const canUseStamps = selectedClient && settings?.enableStampsLoyalty && ((selectedClient.loyaltyStamps || 0) >= (settings?.stampsRequiredForReward || 9999));
   const hasPoints = selectedClient && settings?.enablePointsLoyalty && ((selectedClient.loyaltyPoints || 0) > 0);
 
@@ -248,52 +254,74 @@ export default function LancamentoPage() {
 
       <header className="mb-8 border-b border-zinc-800 pb-4">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <Scissors className="text-[#FFD700]" size={32} />
-          Lançar Serviço
+          <ShoppingCart className="text-[#FFD700]" size={32} />
+          Lançar Venda / Serviço
         </h1>
-        <p className="text-zinc-400 mt-2">Selecione os serviços realizados e finalize o atendimento.</p>
+        <p className="text-zinc-400 mt-2">Selecione os serviços ou produtos vendidos e finalize o atendimento.</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
+        {/* CATÁLOGO ESQUERDO */}
         <div className="lg:col-span-2">
           <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <Plus className="text-[#FFD700]" size={20} />
-              Catálogo de Serviços
-            </h2>
+            
+            <div className="flex gap-4 mb-6 border-b border-zinc-800">
+              <button
+                onClick={() => setActiveTab('SERVICOS')}
+                className={`pb-3 px-2 font-bold flex items-center gap-2 transition-colors border-b-2 ${activeTab === 'SERVICOS' ? 'border-[#FFD700] text-[#FFD700]' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+              >
+                <Scissors size={18} /> Serviços
+              </button>
+              <button
+                onClick={() => setActiveTab('PRODUTOS')}
+                className={`pb-3 px-2 font-bold flex items-center gap-2 transition-colors border-b-2 ${activeTab === 'PRODUTOS' ? 'border-[#FFD700] text-[#FFD700]' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+              >
+                <Package size={18} /> Produtos (Estoque)
+              </button>
+            </div>
 
             {loading ? (
               <div className="text-center py-12 text-zinc-500">Carregando catálogo...</div>
-            ) : catalog.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-zinc-800 rounded-lg">
-                <p className="text-zinc-500">Nenhum serviço ativo encontrado.</p>
-              </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {catalog.map(service => (
+                {(activeTab === 'SERVICOS' ? servicesCatalog : productsCatalog).map(item => (
                   <button
-                    key={service.id}
+                    key={item.id}
                     type="button"
-                    onClick={() => addToCart(service)}
-                    className="flex flex-col text-left bg-black border border-zinc-800 p-4 rounded-lg hover:border-[#FFD700] hover:bg-zinc-800/50 transition-all group"
+                    onClick={() => addToCart(item)}
+                    disabled={item.type === 'PRODUCT' && item.stock !== undefined && item.stock <= 0}
+                    className="flex flex-col text-left bg-black border border-zinc-800 p-4 rounded-lg hover:border-[#FFD700] hover:bg-zinc-800/50 transition-all group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-zinc-800"
                   >
-                    <span className="text-white font-medium group-hover:text-[#FFD700] transition-colors line-clamp-1">{service.name}</span>
-                    <span className="text-zinc-400 font-mono mt-2">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price)}
-                    </span>
+                    <span className="text-white font-medium group-hover:text-[#FFD700] transition-colors line-clamp-1">{item.name}</span>
+                    <div className="flex items-center justify-between w-full mt-2">
+                      <span className="text-zinc-400 font-mono">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+                      </span>
+                      {item.type === 'PRODUCT' && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.stock && item.stock > 0 ? 'bg-zinc-800 text-zinc-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {item.stock && item.stock > 0 ? `${item.stock} un` : 'Esgotado'}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 ))}
+                
+                {(activeTab === 'SERVICOS' ? servicesCatalog : productsCatalog).length === 0 && (
+                  <div className="col-span-full text-center py-12 border-2 border-dashed border-zinc-800 rounded-lg text-zinc-500">
+                    Nenhum {activeTab === 'SERVICOS' ? 'serviço' : 'produto'} cadastrado.
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
 
+        {/* RESUMO DIREITO */}
         <div className="lg:col-span-1">
           <form onSubmit={handleCheckout} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 sticky top-6">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <ShoppingCart className="text-[#FFD700]" size={20} />
-              Resumo do Atendimento
+              <Wallet className="text-[#FFD700]" size={20} /> Checkout
             </h2>
 
             <div className="space-y-4 mb-6 pb-6 border-b border-zinc-800 relative">
@@ -355,35 +383,25 @@ export default function LancamentoPage() {
                   <div className="flex items-center gap-2 text-[#FFD700] font-bold text-sm uppercase">
                     <span>👑 Cliente VIP: {selectedClient.plan.name}</span>
                   </div>
-                  
                   <p className="text-zinc-300 text-xs mt-1">
-                    Serviços usados: <strong className="text-white">{selectedClient.cutsUsedThisMonth || 0}</strong> de 
+                    Cortes usados: <strong className="text-white">{selectedClient.cutsUsedThisMonth || 0}</strong> de 
                     <strong className="text-white"> {selectedClient.plan.maxCuts === 999 ? 'Ilimitado' : selectedClient.plan.maxCuts}</strong>
                   </p>
-                  
-                  {selectedClient.planExpiresAt && (
-                    <p className="text-zinc-500 text-[10px] mt-1 flex items-center gap-1">
-                      Vence em: {new Date(selectedClient.planExpiresAt).toLocaleDateString('pt-BR')}
-                    </p>
-                  )}
                 </div>
               )}
 
-              {/* MÓDULO DE FIDELIDADE (SÓ APARECE SE O CLIENTE EXISTIR E TIVER ALGO) */}
               {(hasPoints || canUseStamps) && (
                 <div className="mt-4 space-y-2 animation-scale-up">
                   <p className="text-xs font-bold text-zinc-500 uppercase">Fidelidade Disponível</p>
-                  
                   {hasPoints && (
                     <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${usePoints ? 'bg-blue-500/10 border-blue-500/50' : 'bg-black border-zinc-800 hover:border-zinc-700'}`}>
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-blue-400 flex items-center gap-1"><Star size={14}/> Usar {selectedClient.loyaltyPoints} Pontos</span>
-                        <span className="text-[10px] text-zinc-400">Valem {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(maxPointsDiscount)} de desconto</span>
+                        <span className="text-sm font-bold text-blue-400 flex items-center gap-1"><Star size={14}/> Usar {selectedClient.loyaltyPoints} Pts</span>
+                        <span className="text-[10px] text-zinc-400">Valem {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(maxPointsDiscount)}</span>
                       </div>
                       <input type="checkbox" checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)} className="accent-blue-500 w-4 h-4" />
                     </label>
                   )}
-
                   {canUseStamps && (
                     <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${useStampReward ? 'bg-orange-500/10 border-orange-500/50' : 'bg-black border-zinc-800 hover:border-zinc-700'}`}>
                       <div className="flex flex-col">
@@ -395,39 +413,35 @@ export default function LancamentoPage() {
                   )}
                 </div>
               )}
-
             </div>
 
             <div className="mb-6 min-h-[120px] max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
               {calculatedCart.length === 0 ? (
-                <div className="text-center text-zinc-500 text-sm py-8 italic">
-                  Nenhum serviço selecionado.
-                </div>
+                <div className="text-center text-zinc-500 text-sm py-8 italic">Carrinho vazio.</div>
               ) : (
                 <ul className="space-y-3">
                   {calculatedCart.map(item => (
                     <li key={item.cartId} className="flex justify-between items-center bg-black p-3 rounded border border-zinc-800">
                       <div className="flex flex-col">
                         <span className="text-sm text-white font-medium flex items-center gap-2">
+                          {item.type === 'PRODUCT' ? <Package size={14} className="text-zinc-500"/> : <Scissors size={14} className="text-zinc-500"/>}
                           {item.name}
                           {item.isCoveredByPlan && (
-                            <span className="bg-[#FFD700]/20 text-[#FFD700] text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                              Plano VIP
-                            </span>
+                            <span className="bg-[#FFD700]/20 text-[#FFD700] text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">VIP</span>
                           )}
                         </span>
-                        <span className="text-xs font-mono mt-1">
+                        <span className="text-xs font-mono mt-1 pl-5">
                           {item.isCoveredByPlan ? (
                             <div className="flex gap-2 items-center">
                               <span className="line-through text-red-400/50">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}</span>
                               <span className="text-emerald-400 font-bold">R$ 0,00</span>
                             </div>
                           ) : (
-                            <span className="text-zinc-500">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}</span>
+                            <span className="text-zinc-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}</span>
                           )}
                         </span>
                       </div>
-                      <button type="button" onClick={() => removeFromCart(item.cartId)} className="text-red-500 hover:text-red-400 p-2 transition-colors" title="Remover">
+                      <button type="button" onClick={() => removeFromCart(item.cartId)} className="text-red-500 hover:text-red-400 p-2 transition-colors">
                         <Trash2 size={16} />
                       </button>
                     </li>
@@ -478,14 +492,8 @@ export default function LancamentoPage() {
                 )}
                 {actualPointsDiscount > 0 && (
                   <div className="flex justify-between text-sm text-blue-400 mb-2">
-                    <span>Desconto ({Math.floor(actualPointsUsed)} pts)</span>
+                    <span>Pts ({Math.floor(actualPointsUsed)})</span>
                     <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(actualPointsDiscount)}</span>
-                  </div>
-                )}
-                {useStampReward && (
-                  <div className="flex justify-between text-[11px] text-orange-400 mb-2 font-bold uppercase tracking-wider">
-                    <span>Prêmio Resgatado!</span>
-                    <span>{settings?.stampRewardDescription}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center text-lg font-bold text-[#FFD700] pt-2 border-t border-zinc-800/50 mt-2">

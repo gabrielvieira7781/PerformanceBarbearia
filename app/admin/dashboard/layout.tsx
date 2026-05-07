@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  LayoutDashboard, Scissors, Users, Wallet, MessageSquare, Settings, LogOut, PlayCircle, Crown, Menu, X
+  LayoutDashboard, Scissors, Users, Wallet, MessageSquare, Settings, LogOut, PlayCircle, Crown, Menu, X, Boxes
 } from 'lucide-react';
 
 export default function AdminDashboardLayout({
@@ -31,13 +31,14 @@ export default function AdminDashboardLayout({
   };
 
   const menuItems = [
-    { name: 'Visão Geral', href: '/admin/dashboard', icon: LayoutDashboard },
-    { name: 'Serviços e Preços', href: '/admin/dashboard/servicos', icon: Scissors },
-    { name: 'Planos e Assinaturas', href: '/admin/dashboard/planos', icon: Crown},
-    { name: 'Gestão de Equipe', href: '/admin/dashboard/equipe', icon: Users },
-    { name: 'Automação WhatsApp', href: '/admin/dashboard/mensagens', icon: MessageSquare },
-    { name: 'Financeiro e Caixa', href: '/admin/dashboard/financeiro', icon: Wallet },
-    { name: 'Configurações', href: '/admin/dashboard/configuracoes', icon: Settings },
+    { name: 'Visão Geral',          href: '/admin/dashboard',               icon: LayoutDashboard },
+    { name: 'Serviços',             href: '/admin/dashboard/servicos',      icon: Scissors },
+    { name: 'Produtos',             href: '/admin/dashboard/produtos',      icon: Boxes },
+    { name: 'Planos e Assinaturas', href: '/admin/dashboard/planos',        icon: Crown},
+    { name: 'Gestão de Equipe',     href: '/admin/dashboard/equipe',        icon: Users },
+    { name: 'Automação WhatsApp',   href: '/admin/dashboard/mensagens',     icon: MessageSquare },
+    { name: 'Financeiro',   href: '/admin/dashboard/financeiro',    icon: Wallet },
+    { name: 'Configurações',        href: '/admin/dashboard/configuracoes', icon: Settings },
   ];
 
   return (

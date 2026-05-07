@@ -127,17 +127,18 @@ model ServiceLog {
   barbershopId  String?
   userId        String
   clientId      String
-  serviceTypeId String
+  serviceTypeId String?
   priceCharged  Float
   paymentMethod String
   status        String   @default("COMPLETED")
   date          DateTime @default(now())
   isCommissionPaid Boolean @default(false) // NOVO: Controla se a comissão já foi paga ao barbeiro
-
   barbershop    Barbershop?  @relation(fields: [barbershopId], references: [id])
   user          User         @relation(fields: [userId], references: [id])
   client        Client       @relation(fields: [clientId], references: [id])
-  serviceType   ServiceType  @relation(fields: [serviceTypeId], references: [id])
+  serviceType   ServiceType?  @relation(fields: [serviceTypeId], references: [id])
+  productId     String?
+  product       Product? @relation(fields: [productId], references: [id])
 }
 
 // ==========================================
@@ -192,4 +193,22 @@ model BarberExpense {
   description  String
   date         DateTime @default(now())
   createdAt    DateTime @default(now())
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  barbershopId String
+  name         String
+  
+  price        Float    // Preço de Venda (Ex: R$ 35.00)
+  costPrice    Float    @default(0) // NOVO: Preço de Custo (Ex: R$ 15.00)
+  
+  stock        Int      @default(0) // Quantidade atual na prateleira
+  minStock     Int      @default(5) // NOVO: Alerta quando chegar nessa quantidade
+  
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  serviceLogs  ServiceLog[]
 }
