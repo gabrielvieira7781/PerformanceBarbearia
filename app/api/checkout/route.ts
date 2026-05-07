@@ -64,9 +64,8 @@ export async function POST(request: Request) {
         const discountValue = Number(discount) || 0;
         let usedPlanCount = 0; 
         
-        let servicesCount = 0; // Quantidade de cortes para somar no Cartão Fidelidade
+        let servicesCount = 0; 
 
-        // === 1. PROCESSAR LOGS DE VENDAS E BAIXAS DE ESTOQUE ===
         for (const item of cart) {
             let finalPrice = Number(item.price);
             let itemPaymentMethod = paymentMethod;
@@ -76,7 +75,6 @@ export async function POST(request: Request) {
                 finalPrice = Math.max(0, finalPrice - itemDiscount);
             }
 
-            // Plano VIP só se aplica a SERVIÇOS
             if (item.type === 'SERVICE' && clientWithPlan?.plan) {
                 const isServiceInPlan = clientWithPlan.plan.services.some(s => s.id === item.id);
                 const currentUsage = clientWithPlan.cutsUsedThisMonth + usedPlanCount;
@@ -89,12 +87,11 @@ export async function POST(request: Request) {
                 }
             }
 
-            // Conta os serviços para o cartão fidelidade (exclui produtos)
             if (item.type === 'SERVICE') {
                 servicesCount++;
             }
 
-            // Salva o ServiceLog (Agora com a capacidade de ser Service ou Product)
+            // O Lançamento oficial criado aqui agora é a fonte de toda a verdade!
             await prisma.serviceLog.create({
                 data: {
                     barbershopId: user.barbershopId,
@@ -108,7 +105,6 @@ export async function POST(request: Request) {
                 }
             });
 
-            // === AQUI FICA A MÁGICA: BAIXA DE ESTOQUE AUTOMÁTICA ===
             if (item.type === 'PRODUCT') {
                 await prisma.product.update({
                     where: { id: item.id },
@@ -124,19 +120,7 @@ export async function POST(request: Request) {
             });
         }
 
-        if (totalToPay > 0) {
-            const itemNames = cart.map((i: any) => i.name).join(', ');
-            await prisma.financialRecord.create({
-                data: {
-                    barbershopId: user.barbershopId,
-                    type: 'INCOME',
-                    amount: totalToPay,
-                    description: `Venda: ${itemNames} - Cliente: ${client.name}`,
-                }
-            });
-        }
-
-        // === 2. MÓDULO DE FIDELIDADE ===
+        // MÓDULO DE FIDELIDADE
         let pointsEarned = 0;
         let stampsEarned = 0;
         let pointsToDeduct = Number(usedPoints) || 0;
@@ -147,7 +131,7 @@ export async function POST(request: Request) {
         }
         
         if (settings?.enableStampsLoyalty) {
-            stampsEarned = servicesCount; // Só ganha selo se fizer corte!
+            stampsEarned = servicesCount;
         }
 
         if (pointsEarned > 0 || stampsEarned > 0 || pointsToDeduct > 0 || stampsToDeduct > 0) {

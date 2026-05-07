@@ -32,12 +32,10 @@ export default function MeuFinanceiroPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'SERVICOS' | 'GASTOS'>('SERVICOS');
 
-  // Filtros
   const [datePreset, setDatePreset] = useState('CICLO');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Modal de Lançar Gasto
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expDesc, setExpDesc] = useState('');
   const [expAmount, setExpAmount] = useState('');
@@ -61,7 +59,6 @@ export default function MeuFinanceiroPage() {
         const json = await res.json();
         setData(json);
         
-        // Sincroniza os inputs de data com o que a API calculou pro "Ciclo Atual"
         if (!start && !end) {
           setStartDate(json.cycleDetails.appliedStartDate);
           setEndDate(json.cycleDetails.appliedEndDate);
@@ -160,11 +157,8 @@ export default function MeuFinanceiroPage() {
       } else {
         showToast('Erro ao salvar gasto.', 'error');
       }
-    } catch (error) {
-      showToast('Erro de conexão.', 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (error) { showToast('Erro de conexão.', 'error'); } 
+    finally { setIsSubmitting(false); }
   };
 
   const translateCycle = (cycle: string) => {
@@ -220,12 +214,22 @@ export default function MeuFinanceiroPage() {
         
         <div className="flex-1 min-w-[130px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Data Inicial</label>
-          <input type="date" disabled={datePreset !== 'CUSTOM'} value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] disabled:opacity-50 text-sm" />
+          <input 
+            type="date" 
+            value={startDate} 
+            onChange={e => { setStartDate(e.target.value); setDatePreset('CUSTOM'); }} 
+            className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] text-sm hover:border-zinc-700 transition-colors" 
+          />
         </div>
         
         <div className="flex-1 min-w-[130px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Data Final</label>
-          <input type="date" disabled={datePreset !== 'CUSTOM'} value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] disabled:opacity-50 text-sm" />
+          <input 
+            type="date" 
+            value={endDate} 
+            onChange={e => { setEndDate(e.target.value); setDatePreset('CUSTOM'); }} 
+            className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] text-sm hover:border-zinc-700 transition-colors" 
+          />
         </div>
 
         {datePreset === 'CUSTOM' && (
@@ -413,7 +417,7 @@ export default function MeuFinanceiroPage() {
                 <input type="number" step="0.01" required value={expAmount} onChange={(e) => setExpAmount(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700]" placeholder="50.00" />
               </div>
               <div className="pt-4 flex flex-col sm:flex-row gap-3 border-t border-zinc-800 mt-4">
-                <button type="button" onClick={() => setIsExpenseModalOpen(false)} className="w-full py-3 bg-zinc-800 text-white font-bold rounded-lg transition-colors hover:bg-zinc-700">Cancelar</button>
+                <button type="button" onClick={() => setIsExpenseModalOpen(false)} className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-lg transition-colors">Cancelar</button>
                 <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-[#FFD700] hover:bg-yellow-500 text-black font-bold rounded-lg transition-colors disabled:opacity-50">
                   {isSubmitting ? 'Salvando...' : 'Registrar'}
                 </button>

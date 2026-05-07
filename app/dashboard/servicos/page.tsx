@@ -133,14 +133,12 @@ export default function LancamentoPage() {
   };
 
   const addToCart = (item: ItemType) => {
-    // Validação de Estoque
     if (item.type === 'PRODUCT') {
       const countInCart = cart.filter(c => c.id === item.id).length;
       if (item.stock !== undefined && countInCart >= item.stock) {
         return showToast(`Estoque insuficiente! Apenas ${item.stock} disponíveis.`, 'error');
       }
     }
-
     setCart(prev => [...prev, { ...item, cartId: Math.random().toString(36).substring(7) }]);
     showToast(`${item.name} adicionado!`, 'success'); 
   };
@@ -149,15 +147,15 @@ export default function LancamentoPage() {
     setCart(prev => prev.filter(item => item.cartId !== cartId));
   };
 
-  // CÁLCULOS
+  // ==========================================
+  // CÁLCULOS FINANCEIROS SUPER INTELIGENTES
+  // ==========================================
   const remainingPlanCuts = selectedClient?.plan ? (selectedClient.plan.maxCuts - (selectedClient.cutsUsedThisMonth || 0)) : 0;
   let tempRemainingCuts = remainingPlanCuts;
   
   const calculatedCart = cart.map(item => {
-    // Plano VIP SÓ se aplica a Serviços, não a produtos!
-    const isCovered = item.type === 'SERVICE' && selectedClient?.plan?.services?.some(s => s.id === item.id);
-    
-    if (isCovered && tempRemainingCuts > 0) {
+    const isCoveredByPlan = item.type === 'SERVICE' && selectedClient?.plan?.services?.some(s => s.id === item.id);
+    if (isCoveredByPlan && tempRemainingCuts > 0) {
       tempRemainingCuts--; 
       return { ...item, finalPrice: 0, isCoveredByPlan: true };
     }
@@ -165,24 +163,38 @@ export default function LancamentoPage() {
   });
 
   const subtotal = calculatedCart.reduce((acc, item) => acc + item.finalPrice, 0);
-  const discountValue = Number(discount) || 0;
+  const manualDiscountValue = Number(discount) || 0;
+  
+  // 1. Desconto do Prêmio de Selos (Zera o item mais caro do carrinho que não esteja no Plano VIP)
+  const highestPriceInCart = calculatedCart.filter(i => !i.isCoveredByPlan).length > 0 
+    ? Math.max(...calculatedCart.filter(i => !i.isCoveredByPlan).map(i => i.finalPrice)) 
+    : 0;
+  const stampDiscountAmount = useStampReward ? highestPriceInCart : 0;
+
+  // 2. Desconto do Cashback (Pontos)
+  const subtotalAfterStampsAndManual = Math.max(0, subtotal - manualDiscountValue - stampDiscountAmount);
   
   const availablePoints = selectedClient?.loyaltyPoints || 0;
   const ptsValue = settings?.pointsDiscountValue || 0;
   const maxPointsDiscount = availablePoints * ptsValue;
   
-  const subtotalAfterManualDiscount = Math.max(0, subtotal - discountValue);
-  
-  const actualPointsDiscount = usePoints ? Math.min(maxPointsDiscount, subtotalAfterManualDiscount) : 0;
+  const actualPointsDiscount = usePoints ? Math.min(maxPointsDiscount, subtotalAfterStampsAndManual) : 0;
   const actualPointsUsed = ptsValue > 0 ? (actualPointsDiscount / ptsValue) : 0;
 
-  const total = Math.max(0, subtotalAfterManualDiscount - actualPointsDiscount);
+  // 3. Valor Final a Pagar e Desconto Total para o Backend
+  const total = Math.max(0, subtotalAfterStampsAndManual - actualPointsDiscount);
+  const totalFinancialDiscountToSendBackend = manualDiscountValue + stampDiscountAmount + actualPointsDiscount;
 
+  // Auto seleciona pagamento se o total zerar
   useEffect(() => {
-    if (cart.length > 0 && total === 0 && paymentMethod !== 'Plano') {
-      setPaymentMethod('Plano');
+    if (cart.length > 0 && total === 0) {
+      if (calculatedCart.some(i => i.isCoveredByPlan)) {
+        setPaymentMethod('Plano VIP');
+      } else if (usePoints || useStampReward) {
+        setPaymentMethod('Fidelidade');
+      }
     }
-  }, [total, cart.length, paymentMethod]);
+  }, [total, cart.length, calculatedCart, usePoints, useStampReward]);
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,9 +212,9 @@ export default function LancamentoPage() {
         body: JSON.stringify({
           clientName,
           clientPhone: cleanPhone,
-          cart, // Vai com 'type: PRODUCT ou SERVICE'
+          cart,
           paymentMethod,
-          discount: discountValue,
+          discount: totalFinancialDiscountToSendBackend, // Envia o somatório de todos os descontos aplicados
           totalToPay: total,
           usedPoints: actualPointsUsed,
           usedStampsReward: useStampReward
@@ -390,25 +402,69 @@ export default function LancamentoPage() {
                 </div>
               )}
 
+              {/* BANNER DE GAMIFICAÇÃO E PROGRESSO DO CLIENTE */}
+              {selectedClient && (settings?.enablePointsLoyalty || settings?.enableStampsLoyalty) && (
+                <div className="mt-4 p-4 bg-zinc-800/30 border border-zinc-700/50 rounded-lg animation-scale-up shadow-inner">
+                  <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                    <Award className="text-[#FFD700]" size={16} /> Progresso do Cliente
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    {settings?.enableStampsLoyalty && (
+                      <div>
+                        <div className="flex justify-between text-xs mb-1.5">
+                          <span className="text-zinc-400 font-medium">Cartão de Selos</span>
+                          <span className="text-orange-400 font-bold">{selectedClient.loyaltyStamps || 0} de {settings.stampsRequiredForReward}</span>
+                        </div>
+                        <div className="w-full bg-black rounded-full h-2 border border-zinc-700 overflow-hidden">
+                          <div className="bg-orange-500 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, ((selectedClient.loyaltyStamps || 0) / settings.stampsRequiredForReward) * 100)}%` }}></div>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 mt-1.5">
+                          {((selectedClient.loyaltyStamps || 0) >= settings.stampsRequiredForReward) 
+                            ? <span className="text-orange-400 font-bold">🎉 Meta atingida! Prêmio liberado.</span>
+                            : `Faltam ${settings.stampsRequiredForReward - (selectedClient.loyaltyStamps || 0)} cortes para ganhar: ${settings.stampRewardDescription}`
+                          }
+                        </p>
+                      </div>
+                    )}
+
+                    {settings?.enablePointsLoyalty && (
+                      <div className={`${settings?.enableStampsLoyalty ? 'pt-3 border-t border-zinc-700/50' : ''}`}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-zinc-400 font-medium">Cashback (Pontos)</span>
+                          <span className="text-blue-400 font-bold">{selectedClient.loyaltyPoints || 0} pts</span>
+                        </div>
+                        <p className="text-[10px] text-zinc-500">
+                          Equivale a <strong className="text-blue-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(maxPointsDiscount)}</strong> para usar em descontos.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* OPÇÕES DE RESGATE DE BENEFÍCIOS */}
               {(hasPoints || canUseStamps) && (
                 <div className="mt-4 space-y-2 animation-scale-up">
-                  <p className="text-xs font-bold text-zinc-500 uppercase">Fidelidade Disponível</p>
-                  {hasPoints && (
-                    <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${usePoints ? 'bg-blue-500/10 border-blue-500/50' : 'bg-black border-zinc-800 hover:border-zinc-700'}`}>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-blue-400 flex items-center gap-1"><Star size={14}/> Usar {selectedClient.loyaltyPoints} Pts</span>
-                        <span className="text-[10px] text-zinc-400">Valem {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(maxPointsDiscount)}</span>
-                      </div>
-                      <input type="checkbox" checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)} className="accent-blue-500 w-4 h-4" />
-                    </label>
-                  )}
+                  <p className="text-xs font-bold text-zinc-500 uppercase">Resgatar Benefícios</p>
+                  
                   {canUseStamps && (
                     <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${useStampReward ? 'bg-orange-500/10 border-orange-500/50' : 'bg-black border-zinc-800 hover:border-zinc-700'}`}>
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-orange-400 flex items-center gap-1"><Gift size={14}/> Resgatar Prêmio!</span>
-                        <span className="text-[10px] text-zinc-400">Prêmio: {settings?.stampRewardDescription}</span>
+                        <span className="text-sm font-bold text-orange-400 flex items-center gap-1"><Gift size={14}/> Resgatar Prêmio</span>
+                        <span className="text-[10px] text-zinc-400">{settings?.stampRewardDescription} (Abate o maior valor)</span>
                       </div>
                       <input type="checkbox" checked={useStampReward} onChange={(e) => setUseStampReward(e.target.checked)} className="accent-orange-500 w-4 h-4" />
+                    </label>
+                  )}
+
+                  {hasPoints && (
+                    <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${usePoints ? 'bg-blue-500/10 border-blue-500/50' : 'bg-black border-zinc-800 hover:border-zinc-700'}`}>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-blue-400 flex items-center gap-1"><Star size={14}/> Usar Cashback</span>
+                        <span className="text-[10px] text-zinc-400">Abate até {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(maxPointsDiscount)} do valor final</span>
+                      </div>
+                      <input type="checkbox" checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)} className="accent-blue-500 w-4 h-4" />
                     </label>
                   )}
                 </div>
@@ -464,7 +520,8 @@ export default function LancamentoPage() {
                     <option value="Pix">💠 Pix</option>
                     <option value="Débito">💳 Débito</option>
                     <option value="Crédito">💳 Crédito</option>
-                    <option value="Plano">👑 Plano VIP</option>
+                    <option value="Plano VIP">👑 Plano VIP</option>
+                    <option value="Fidelidade">🎁 Fidelidade / Prêmio</option>
                   </select>
                 </div>
                 <div className="w-24">
@@ -479,23 +536,34 @@ export default function LancamentoPage() {
                 </div>
               </div>
 
+              {/* NOTA FISCAL DESCRIMINADA */}
               <div className="bg-black/50 p-4 rounded-lg border border-zinc-800 mt-4">
                 <div className="flex justify-between text-sm text-zinc-400 mb-2">
                   <span>Subtotal</span>
                   <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
                 </div>
-                {discountValue > 0 && (
+                
+                {manualDiscountValue > 0 && (
                   <div className="flex justify-between text-sm text-red-400 mb-2">
                     <span>Desconto Manual</span>
-                    <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountValue)}</span>
+                    <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(manualDiscountValue)}</span>
                   </div>
                 )}
+                
+                {useStampReward && stampDiscountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-orange-400 mb-2">
+                    <span className="flex items-center gap-1"><Gift size={12}/> Prêmio Resgatado</span>
+                    <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stampDiscountAmount)}</span>
+                  </div>
+                )}
+
                 {actualPointsDiscount > 0 && (
                   <div className="flex justify-between text-sm text-blue-400 mb-2">
-                    <span>Pts ({Math.floor(actualPointsUsed)})</span>
+                    <span className="flex items-center gap-1"><Star size={12}/> Cashback ({Math.floor(actualPointsUsed)} pts)</span>
                     <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(actualPointsDiscount)}</span>
                   </div>
                 )}
+                
                 <div className="flex justify-between items-center text-lg font-bold text-[#FFD700] pt-2 border-t border-zinc-800/50 mt-2">
                   <span>TOTAL</span>
                   <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span>

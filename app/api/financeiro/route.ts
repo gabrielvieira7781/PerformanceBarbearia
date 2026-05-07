@@ -20,50 +20,79 @@ async function getUserAuth() {
 export async function GET() {
     try {
         const user = await getUserAuth();
-        if (!user || !user.barbershopId || (user.role !== 'ADMIN' && !user.permissions.includes('admin_panel'))) {
-            return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
-        }
+        if (!user || !user.barbershopId) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
 
-        const records = await prisma.financialRecord.findMany({
-            where: { barbershopId: user.barbershopId },
-            orderBy: { id: 'desc' }
+        // 1. Busca APENAS as DESPESAS lançadas manualmente na tela do financeiro
+        const expenses = await prisma.financialRecord.findMany({
+            where: { 
+                barbershopId: user.barbershopId,
+                type: 'EXPENSE' 
+            }
         });
 
-        return NextResponse.json(records, { status: 200 });
+        // 2. Busca OS SERVIÇOS E VENDAS reais como a única fonte de Receita
+        const logs = await prisma.serviceLog.findMany({
+            where: { barbershopId: user.barbershopId },
+            include: { client: true, serviceType: true, product: true }
+        });
+
+        // 3. Transforma os cortes/vendas no formato que a tela do Financeiro entende
+        const incomesFromLogs = logs.map(log => {
+            const itemName = log.serviceType?.name || log.product?.name || 'Item';
+            return {
+                id: log.id,
+                type: 'INCOME',
+                amount: log.priceCharged,
+                description: `Venda/Serviço: ${itemName} - Cliente: ${log.client?.name || 'Avulso'}`,
+                category: 'VENDAS_E_SERVICOS',
+                status: 'PAID', // Se passou no PDV, o dinheiro já entrou no caixa
+                dueDate: log.date, // CORRIGIDO AQUI
+                paidAt: log.date,  // CORRIGIDO AQUI
+                paymentMethod: log.paymentMethod,
+                createdAt: log.date // CORRIGIDO AQUI
+            };
+        });
+
+        // 4. Junta as despesas com as receitas e ordena por data
+        const allRecords = [...expenses, ...incomesFromLogs].sort((a: any, b: any) => {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+
+        return NextResponse.json(allRecords, { status: 200 });
     } catch (error) {
-        return NextResponse.json({ message: 'Erro ao buscar dados.' }, { status: 500 });
+        return NextResponse.json({ message: 'Erro ao buscar registros financeiros.' }, { status: 500 });
     }
 }
 
 export async function POST(request: Request) {
     try {
         const user = await getUserAuth();
-        if (!user || !user.barbershopId || (user.role !== 'ADMIN' && !user.permissions.includes('admin_panel'))) {
-            return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
-        }
+        if (!user || !user.barbershopId) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
 
         const body = await request.json();
-        const { description, amount, category, status, dueDate, paidAt } = body;
+        const { description, amount, category, status, paymentMethod, dueDate, paidAt } = body;
 
         if (!description || !amount) {
-            return NextResponse.json({ message: 'Descrição e valor obrigatórios.' }, { status: 400 });
+            return NextResponse.json({ message: 'Dados incompletos.' }, { status: 400 });
         }
 
-        const newRecord = await prisma.financialRecord.create({
+        // Tudo criado manualmente no modal da tela financeira entra exclusivamente como DESPESA
+        const record = await prisma.financialRecord.create({
             data: {
                 barbershopId: user.barbershopId,
                 type: 'EXPENSE',
-                amount: Number(amount),
                 description,
+                amount: Number(amount),
                 category: category || 'VARIAVEL',
                 status: status || 'PAID',
-                dueDate: dueDate ? new Date(dueDate) : new Date(),
-                paidAt: status === 'PAID' ? (paidAt ? new Date(paidAt) : new Date()) : null
+                paymentMethod: paymentMethod || null,
+                dueDate: dueDate ? new Date(`${dueDate}T12:00:00Z`) : new Date(),
+                paidAt: paidAt ? new Date(`${paidAt}T12:00:00Z`) : null,
             }
         });
 
-        return NextResponse.json(newRecord, { status: 201 });
+        return NextResponse.json(record, { status: 201 });
     } catch (error) {
-        return NextResponse.json({ message: 'Erro ao lançar despesa.' }, { status: 500 });
+        return NextResponse.json({ message: 'Erro ao criar registro.' }, { status: 500 });
     }
 }

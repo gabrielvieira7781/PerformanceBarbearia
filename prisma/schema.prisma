@@ -47,10 +47,11 @@ model User {
   createdAt               DateTime     @default(now())
   updatedAt               DateTime     @updatedAt
 
-  barbershop Barbershop?  @relation(fields: [barbershopId], references: [id])
-  services   ServiceLog[]
-  commissionRate Float?   @default(50)       // Porcentagem de comissão (Ex: 50%)
-  paymentCycle   String?  @default("WEEKLY") // Ciclo: DAILY, WEEKLY, BIWEEKLY, MONTHLY
+  barbershop              Barbershop?  @relation(fields: [barbershopId], references: [id])
+  services                ServiceLog[]
+  commissionRate          Float?   @default(50)       // Porcentagem de comissão (Ex: 50%)
+  paymentCycle            String?  @default("WEEKLY") // Ciclo: DAILY, WEEKLY, BIWEEKLY, MONTHLY
+  appointments            Appointment[] // ADICIONE APENAS ESTA LINHA
 }
 
 // ==========================================
@@ -86,17 +87,17 @@ model Client {
   dependents        Client[] @relation("FamilyLink")
 
   // Clube de Assinatura Atualizado
-  planId            String?
-  plan              SubscriptionPlan? @relation(fields: [planId], references: [id])
-  cutsUsedThisMonth Int      @default(0) // RESTAURADO: Nome original para não perder dados
-  planExpiresAt     DateTime?            // NOVO: Data exata em que o plano vence!
+  planId             String?
+  plan                SubscriptionPlan? @relation(fields: [planId], references: [id])
+  cutsUsedThisMonth   Int      @default(0) // RESTAURADO: Nome original para não perder dados
+  planExpiresAt       DateTime?            // NOVO: Data exata em que o plano vence!
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   loyaltyPoints Float @default(0)
   loyaltyStamps Int   @default(0)
-
+  appointments        Appointment[] // ADICIONE APENAS ESTA LINHA
   barbershop        Barbershop?  @relation(fields: [barbershopId], references: [id])
   services          ServiceLog[]
 }
@@ -114,9 +115,10 @@ model ServiceType {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   plans        SubscriptionPlan[] // NOVO: Planos que aceitam este serviço
-
+  duration     Int      @default(40)
   barbershop   Barbershop?  @relation(fields: [barbershopId], references: [id])
   logs         ServiceLog[]
+  appointments Appointment[] // ADICIONE APENAS ESTA LINHA
 }
 
 // ==========================================
@@ -211,4 +213,26 @@ model Product {
   updatedAt    DateTime @updatedAt
 
   serviceLogs  ServiceLog[]
+}
+
+model Appointment {
+  id           String   @id @default(cuid())
+  barbershopId String
+  
+  userId       String   // O Barbeiro que vai realizar o atendimento
+  user         User     @relation(fields: [userId], references: [id])
+  
+  clientId     String   // O Cliente que agendou
+  client       Client   @relation(fields: [clientId], references: [id])
+  
+  serviceId    String?  // Serviço desejado (Opcional, pois pode escolher na hora)
+  service      ServiceType? @relation(fields: [serviceId], references: [id])
+  
+  startTime    DateTime // Data e hora exata que começa o corte
+  endTime      DateTime // Data e hora que termina (para o sistema calcular horários livres)
+  
+  status       String   @default("SCHEDULED") // Status: SCHEDULED, COMPLETED ou CANCELED
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

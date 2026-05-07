@@ -13,6 +13,7 @@ import {
   LogOut,
   ShieldAlert,
   Menu,
+  CalendarIcon,
   X // NOVO: Ícones para o botão do celular
 } from 'lucide-react';
 
@@ -66,6 +67,7 @@ export default function DashboardLayout({
     { name: 'Lançar Serviço', href: '/dashboard/servicos', icon: Scissors },
     { name: 'Clientes', href: '/dashboard/clientes', icon: Users },
     { name: 'Mensagens', href: '/dashboard/mensagens', icon: MessageSquare },
+    { name: 'Agenda', href: '/dashboard/agenda', icon: CalendarIcon },
     { name: 'Financeiro', href: '/dashboard/meu-financeiro', icon: Wallet },
   ];
 

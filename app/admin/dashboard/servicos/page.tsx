@@ -1,13 +1,13 @@
-// app/admin/dashboard/servicos/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Scissors, Tag, Pencil, X, Trash2 } from 'lucide-react';
+import { Plus, Scissors, Tag, Pencil, X, Trash2, Clock } from 'lucide-react';
 
 interface ServiceType {
   id: string;
   name: string;
   price: number;
+  duration: number; // NOVO
   description: string | null;
   isActive: boolean;
 }
@@ -20,6 +20,7 @@ export default function ServicosPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
+  const [duration, setDuration] = useState('40'); // Padrão 40 min
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
   
@@ -49,6 +50,7 @@ export default function ServicosPage() {
     setEditingId(service.id);
     setName(service.name);
     setPrice(service.price.toString());
+    setDuration(service.duration?.toString() || '40');
     setDescription(service.description || '');
     setIsActive(service.isActive);
     setError('');
@@ -60,6 +62,7 @@ export default function ServicosPage() {
     setEditingId(null);
     setName('');
     setPrice('');
+    setDuration('40');
     setDescription('');
     setIsActive(true);
     setError('');
@@ -80,6 +83,7 @@ export default function ServicosPage() {
         body: JSON.stringify({
           name: service.name,
           price: service.price,
+          duration: service.duration,
           description: service.description,
           isActive: newStatus
         })
@@ -88,7 +92,7 @@ export default function ServicosPage() {
       if (!res.ok) {
         fetchServices();
         const data = await res.json();
-        setError(data.message || 'Erro ao alterar o status do serviço.');
+        setError(data.message || 'Erro ao alterar o status.');
       } else {
         setSuccess(newStatus ? 'Serviço ativado!' : 'Serviço inativado!');
         setTimeout(() => setSuccess(''), 2000);
@@ -100,18 +104,11 @@ export default function ServicosPage() {
   };
 
   const handleDeleteClick = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.')) {
-      return;
-    }
-
-    setError('');
-    setSuccess('');
+    if (!window.confirm('Tem certeza que deseja excluir este serviço?')) return;
+    setError(''); setSuccess('');
 
     try {
-      const res = await fetch(`/api/services/${id}`, {
-        method: 'DELETE',
-      });
-
+      const res = await fetch(`/api/services/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setSuccess('Serviço excluído com sucesso!');
         fetchServices();
@@ -120,7 +117,7 @@ export default function ServicosPage() {
         setError(data.message || 'Erro ao excluir o serviço.');
       }
     } catch (err) {
-      setError('Erro de conexão com o servidor.');
+      setError('Erro de conexão.');
     } finally {
       setTimeout(() => setSuccess(''), 4000);
     }
@@ -128,12 +125,10 @@ export default function ServicosPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-    setIsSubmitting(true);
+    setError(''); setSuccess(''); setIsSubmitting(true);
 
-    if (!name || !price) {
-      setError('O nome do serviço e o preço são obrigatórios.');
+    if (!name || !price || !duration) {
+      setError('Nome, preço e duração são obrigatórios.');
       setIsSubmitting(false);
       return;
     }
@@ -150,6 +145,7 @@ export default function ServicosPage() {
         body: JSON.stringify({
           name,
           price: formattedPrice,
+          duration: Number(duration),
           description,
           isActive: editingId ? isActive : true 
         })
@@ -178,9 +174,7 @@ export default function ServicosPage() {
           <Scissors className="text-[#FFD700]" size={32} />
           Serviços e Preços
         </h1>
-        <p className="text-zinc-400 mt-2">
-          Cadastre e gerencie os cortes, produtos e serviços oferecidos pela sua barbearia.
-        </p>
+        <p className="text-zinc-400 mt-2">Cadastre e gerencie os cortes, produtos e serviços oferecidos pela sua barbearia.</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -190,64 +184,53 @@ export default function ServicosPage() {
           <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 sticky top-6">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               {editingId ? (
-                <>
-                  <Pencil className="text-[#FFD700]" size={20} />
-                  Editar Serviço
-                </>
+                <><Pencil className="text-[#FFD700]" size={20} /> Editar Serviço</>
               ) : (
-                <>
-                  <Plus className="text-[#FFD700]" size={20} />
-                  Novo Serviço
-                </>
+                <><Plus className="text-[#FFD700]" size={20} /> Novo Serviço</>
               )}
             </h2>
 
-            {error && (
-              <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm">
-                {error}
-              </div>
-            )}
-
-            {success && (
-              <div className="bg-green-500/10 border border-green-500 text-green-500 p-3 rounded mb-4 text-sm">
-                {success}
-              </div>
-            )}
+            {error && <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm">{error}</div>}
+            {success && <div className="bg-green-500/10 border border-green-500 text-green-500 p-3 rounded mb-4 text-sm">{success}</div>}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-1">Nome do Serviço *</label>
                 <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  type="text" value={name} onChange={(e) => setName(e.target.value)}
                   className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors"
                   placeholder="Ex: Corte Degradê"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">Preço Padrão (R$) *</label>
-                <input
-                  type="text"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors"
-                  placeholder="Ex: 45.00"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">Preço (R$) *</label>
+                  <input
+                    type="text" value={price} onChange={(e) => setPrice(e.target.value)}
+                    className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors"
+                    placeholder="Ex: 45.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#FFD700] mb-1 flex items-center gap-1"><Clock size={12}/> Tempo (Min)</label>
+                  <input
+                    type="number" value={duration} onChange={(e) => setDuration(e.target.value)}
+                    className="w-full bg-black border border-[#FFD700]/30 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors font-bold"
+                    placeholder="Ex: 40"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-1">Descrição (Opcional)</label>
                 <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  value={description} onChange={(e) => setDescription(e.target.value)}
                   className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors resize-none h-24"
                   placeholder="Detalhes sobre o serviço..."
                 />
               </div>
 
-              {/* Botão de Toggle blindado com cor nativa (Formulário) */}
               {editingId && (
                 <div className="flex items-center gap-3 py-2">
                   <div
@@ -255,35 +238,19 @@ export default function ServicosPage() {
                     className="w-11 h-6 rounded-full cursor-pointer relative flex items-center px-0.5 transition-colors duration-300"
                     style={{ backgroundColor: isActive ? '#22c55e' : '#3f3f46' }}
                   >
-                    <div
-                      className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${
-                        isActive ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
+                    <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${isActive ? 'translate-x-5' : 'translate-x-0'}`} />
                   </div>
-                  <span className="text-sm font-medium text-zinc-300">
-                    {isActive ? 'Serviço Ativo' : 'Serviço Inativo'}
-                  </span>
+                  <span className="text-sm font-medium text-zinc-300">{isActive ? 'Serviço Ativo' : 'Serviço Inativo'}</span>
                 </div>
               )}
 
               <div className="pt-2 flex flex-col gap-2">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-[#FFD700] text-black font-bold rounded px-4 py-3 hover:bg-yellow-500 transition-colors disabled:opacity-50"
-                >
+                <button type="submit" disabled={isSubmitting} className="w-full bg-[#FFD700] text-black font-bold rounded px-4 py-3 hover:bg-yellow-500 transition-colors disabled:opacity-50">
                   {isSubmitting ? 'Salvando...' : (editingId ? 'Atualizar Serviço' : 'Salvar Serviço')}
                 </button>
-
                 {editingId && (
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="w-full bg-transparent border border-zinc-700 text-white font-bold rounded px-4 py-3 hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <X size={18} />
-                    Cancelar
+                  <button type="button" onClick={handleCancelEdit} className="w-full bg-transparent border border-zinc-700 text-white font-bold rounded px-4 py-3 hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2">
+                    <X size={18} /> Cancelar
                   </button>
                 )}
               </div>
@@ -294,19 +261,12 @@ export default function ServicosPage() {
         {/* Tabela de Serviços */}
         <div className="lg:col-span-2">
           <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <Tag className="text-[#FFD700]" size={20} />
-              Catálogo de Serviços
-            </h2>
-
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Tag className="text-[#FFD700]" size={20} /> Catálogo de Serviços</h2>
             {loading ? (
-              <div className="text-center py-12 text-zinc-500">
-                Carregando catálogo...
-              </div>
+              <div className="text-center py-12 text-zinc-500">Carregando catálogo...</div>
             ) : services.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-zinc-800 rounded-lg">
                 <p className="text-zinc-500">Nenhum serviço cadastrado ainda.</p>
-                <p className="text-zinc-600 text-sm mt-1">Use o formulário ao lado para começar.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -314,6 +274,7 @@ export default function ServicosPage() {
                   <thead>
                     <tr className="border-b border-zinc-800">
                       <th className="py-3 px-4 text-zinc-400 font-medium">Serviço</th>
+                      <th className="py-3 px-4 text-zinc-400 font-medium text-center">Tempo</th>
                       <th className="py-3 px-4 text-zinc-400 font-medium hidden md:table-cell text-center">Status</th>
                       <th className="py-3 px-4 text-zinc-400 font-medium text-right">Preço</th>
                       <th className="py-3 px-4 text-zinc-400 font-medium text-center w-28">Ações</th>
@@ -322,50 +283,24 @@ export default function ServicosPage() {
                   <tbody>
                     {services.map((service) => (
                       <tr key={service.id} className={`border-b border-zinc-800/50 transition-colors ${!service.isActive ? 'opacity-50 hover:opacity-100' : 'hover:bg-zinc-800/20'}`}>
-                        <td className="py-4 px-4 text-white font-medium">
-                          {service.name}
+                        <td className="py-4 px-4 text-white font-medium">{service.name}</td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="bg-black border border-zinc-700 text-zinc-400 text-xs px-2 py-1 rounded font-mono">{service.duration || 40} min</span>
                         </td>
-                        
-                        {/* Botão de Toggle blindado com cor nativa (Tabela) */}
                         <td className="py-4 px-4 hidden md:table-cell">
                           <div className="flex justify-center">
-                            <div
-                              onClick={() => handleToggleStatus(service)}
-                              title={service.isActive ? "Desativar serviço" : "Ativar serviço"}
-                              className="w-11 h-6 rounded-full cursor-pointer relative flex items-center px-0.5 transition-colors duration-300"
-                              style={{ backgroundColor: service.isActive ? '#22c55e' : '#3f3f46' }}
-                            >
-                              <div
-                                className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${
-                                  service.isActive ? 'translate-x-5' : 'translate-x-0'
-                                }`}
-                              />
+                            <div onClick={() => handleToggleStatus(service)} className="w-11 h-6 rounded-full cursor-pointer relative flex items-center px-0.5 transition-colors duration-300" style={{ backgroundColor: service.isActive ? '#22c55e' : '#3f3f46' }}>
+                              <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${service.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
                             </div>
                           </div>
                         </td>
-
                         <td className="py-4 px-4 text-[#FFD700] font-bold text-right whitespace-nowrap">
-                          {new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL'
-                          }).format(service.price)}
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price)}
                         </td>
                         <td className="py-4 px-4">
                           <div className="flex items-center justify-center gap-2">
-                            <button 
-                              onClick={() => handleEditClick(service)}
-                              className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded transition-colors"
-                              title="Editar Serviço"
-                            >
-                              <Pencil size={16} />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteClick(service.id)}
-                              className="p-2 bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-500 rounded transition-colors"
-                              title="Excluir Serviço"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <button onClick={() => handleEditClick(service)} className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded transition-colors"><Pencil size={16} /></button>
+                            <button onClick={() => handleDeleteClick(service.id)} className="p-2 bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-500 rounded transition-colors"><Trash2 size={16} /></button>
                           </div>
                         </td>
                       </tr>
@@ -376,7 +311,6 @@ export default function ServicosPage() {
             )}
           </div>
         </div>
-
       </div>
     </div>
   );

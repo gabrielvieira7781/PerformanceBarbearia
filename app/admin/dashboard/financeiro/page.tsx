@@ -345,12 +345,22 @@ export default function FinanceiroPage() {
         
         <div className="flex-1 min-w-[130px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Data Inicial</label>
-          <input type="date" disabled={datePreset !== 'CUSTOM'} value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] disabled:opacity-50 text-sm" />
+          <input 
+            type="date" 
+            value={startDate} 
+            onChange={e => { setStartDate(e.target.value); setDatePreset('CUSTOM'); }} 
+            className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] text-sm hover:border-zinc-700 transition-colors" 
+          />
         </div>
         
         <div className="flex-1 min-w-[130px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Data Final</label>
-          <input type="date" disabled={datePreset !== 'CUSTOM'} value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] disabled:opacity-50 text-sm" />
+          <input 
+            type="date" 
+            value={endDate} 
+            onChange={e => { setEndDate(e.target.value); setDatePreset('CUSTOM'); }} 
+            className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] text-sm hover:border-zinc-700 transition-colors" 
+          />
         </div>
 
         <div className="flex-1 min-w-[140px] w-full">
