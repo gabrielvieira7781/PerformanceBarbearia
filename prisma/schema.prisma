@@ -159,6 +159,7 @@ model FinancialRecord {
   dueDate      DateTime? @default(now())     // Data de Vencimento
   category     String?   @default("VARIAVEL")
   paidAt       DateTime?  // NOVO: Data em que a conta foi efetivamente paga
+  paymentMethod String?
 
   barbershop   Barbershop?  @relation(fields: [barbershopId], references: [id])
 }
