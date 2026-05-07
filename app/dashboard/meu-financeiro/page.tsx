@@ -1,4 +1,3 @@
-// app/dashboard/meu-financeiro/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -76,7 +75,6 @@ export default function MeuFinanceiroPage() {
   };
 
   useEffect(() => {
-    // Carrega o Ciclo Padrão na primeira vez
     fetchFinanceData();
   }, []);
 
@@ -84,7 +82,7 @@ export default function MeuFinanceiroPage() {
     setDatePreset(type);
     
     if (type === 'CICLO') {
-      fetchFinanceData(); // A API calcula automaticamente
+      fetchFinanceData(); 
       return;
     }
 
@@ -158,7 +156,6 @@ export default function MeuFinanceiroPage() {
         setIsExpenseModalOpen(false);
         setExpDesc('');
         setExpAmount('');
-        // Refaz a busca mantendo as datas atuais
         fetchFinanceData(startDate, endDate);
       } else {
         showToast('Erro ao salvar gasto.', 'error');
@@ -177,7 +174,7 @@ export default function MeuFinanceiroPage() {
 
   if (loading && !data) {
     return (
-      <div className="p-8 flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="p-4 md:p-8 flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="w-10 h-10 border-4 border-[#FFD700] border-t-transparent rounded-full animate-spin"></div>
         <p className="text-zinc-500 font-medium">Buscando seus resultados...</p>
       </div>
@@ -205,7 +202,7 @@ export default function MeuFinanceiroPage() {
 
       {/* ================= BARRA DE FILTROS ================= */}
       <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row flex-wrap gap-4 items-end">
-        <div className="flex-1 min-w-[160px]">
+        <div className="flex-1 min-w-[160px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1 flex items-center gap-1"><Calendar size={12}/> Período de Busca</label>
           <select 
             value={datePreset} 
@@ -221,20 +218,22 @@ export default function MeuFinanceiroPage() {
           </select>
         </div>
         
-        <div className="flex-1 min-w-[130px]">
+        <div className="flex-1 min-w-[130px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Data Inicial</label>
           <input type="date" disabled={datePreset !== 'CUSTOM'} value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] disabled:opacity-50 text-sm" />
         </div>
         
-        <div className="flex-1 min-w-[130px]">
+        <div className="flex-1 min-w-[130px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Data Final</label>
           <input type="date" disabled={datePreset !== 'CUSTOM'} value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] disabled:opacity-50 text-sm" />
         </div>
 
         {datePreset === 'CUSTOM' && (
-          <button onClick={handleCustomSearch} className="bg-[#FFD700] text-black font-bold px-4 py-2 rounded-lg text-sm hover:bg-yellow-500 transition-colors">
-            Filtrar
-          </button>
+          <div className="w-full md:w-auto flex-none">
+            <button onClick={handleCustomSearch} className="w-full md:w-auto bg-[#FFD700] text-black font-bold px-6 py-2 rounded-lg text-sm hover:bg-yellow-500 transition-colors">
+              Filtrar
+            </button>
+          </div>
         )}
       </div>
 
@@ -290,9 +289,9 @@ export default function MeuFinanceiroPage() {
 
           {/* LISTA DE SERVIÇOS FEITOS */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mt-6">
-            <div className="p-5 border-b border-zinc-800 bg-black/20 flex justify-between items-center">
+            <div className="p-4 md:p-5 border-b border-zinc-800 bg-black/20 flex justify-between items-center">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <Scissors className="text-[#FFD700]" size={20} /> Detalhamento de Cortes
+                <Scissors className="text-[#FFD700]" size={20} /> <span className="hidden sm:inline">Detalhamento de</span> Cortes
               </h2>
               <span className="text-xs font-bold bg-zinc-800 text-zinc-300 px-3 py-1 rounded-full">{data?.logs.length} serviços</span>
             </div>
@@ -306,36 +305,36 @@ export default function MeuFinanceiroPage() {
                </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse min-w-[500px]">
                   <thead className="bg-zinc-800/30">
                     <tr className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
-                      <th className="py-4 px-6">Data / Cliente</th>
-                      <th className="py-4 px-6">Serviço / Método</th>
-                      <th className="py-4 px-6 text-right">Valor do Serviço</th>
-                      <th className="py-4 px-6 text-right">Sua Comissão</th>
-                      <th className="py-4 px-6 text-center">Status</th>
+                      <th className="py-4 px-4 md:px-6">Data / Cliente</th>
+                      <th className="py-4 px-4 md:px-6">Serviço / Método</th>
+                      <th className="py-4 px-4 md:px-6 text-right">Valor</th>
+                      <th className="py-4 px-4 md:px-6 text-right">Comissão</th>
+                      <th className="py-4 px-4 md:px-6 text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/50">
                     {data?.logs.map(log => (
                       <tr key={log.id} className="hover:bg-zinc-800/20 transition-colors">
-                        <td className="py-3 px-6">
-                          <p className="text-white font-medium text-sm">{log.clientName}</p>
+                        <td className="py-3 px-4 md:px-6">
+                          <p className="text-white font-medium text-sm line-clamp-1">{log.clientName}</p>
                           <p className="text-zinc-500 text-[10px] font-mono">{new Date(log.date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</p>
                         </td>
-                        <td className="py-3 px-6">
-                          <p className="text-zinc-300 text-xs font-bold">{log.serviceName}</p>
+                        <td className="py-3 px-4 md:px-6">
+                          <p className="text-zinc-300 text-xs font-bold line-clamp-1">{log.serviceName}</p>
                           <p className={`text-[9px] uppercase font-bold mt-1 inline-block px-1.5 py-0.5 rounded ${log.paymentMethod.includes('Plano') ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}>
                             {log.paymentMethod}
                           </p>
                         </td>
-                        <td className="py-3 px-6 text-right font-mono text-zinc-400 text-sm">
+                        <td className="py-3 px-4 md:px-6 text-right font-mono text-zinc-400 text-sm">
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(log.baseValue)}
                         </td>
-                        <td className="py-3 px-6 text-right font-mono font-bold text-emerald-400 text-sm">
+                        <td className="py-3 px-4 md:px-6 text-right font-mono font-bold text-emerald-400 text-sm whitespace-nowrap">
                           + {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(log.myCut)}
                         </td>
-                        <td className="py-3 px-6 text-center">
+                        <td className="py-3 px-4 md:px-6 text-center">
                           {log.isCommissionPaid ? (
                             <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase px-2 py-1 rounded inline-flex items-center gap-1">
                               <CheckCircle2 size={12}/> Recebido
@@ -359,17 +358,17 @@ export default function MeuFinanceiroPage() {
       {/* ================= ABA GASTOS PESSOAIS ================= */}
       {activeTab === 'GASTOS' && data?.settings.allowBarberExpenses && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden animate-in fade-in">
-          <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-black/20">
+          <div className="p-4 md:p-6 border-b border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-black/20">
             <div>
               <h2 className="text-xl font-bold text-white flex items-center gap-2"><Receipt className="text-[#FFD700]" /> Controle de Gastos</h2>
               <p className="text-zinc-500 text-xs mt-1">Registros pessoais para abater do seu lucro líquido.</p>
             </div>
-            <button onClick={() => setIsExpenseModalOpen(true)} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-2">
+            <button onClick={() => setIsExpenseModalOpen(true)} className="w-full sm:w-auto bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-4 py-3 sm:py-2 rounded-lg transition-all text-sm flex justify-center items-center gap-2">
               <Plus size={16} /> Lançar Gasto
             </button>
           </div>
 
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             {loading ? (
                <div className="p-8 text-center text-zinc-500">Atualizando lista...</div>
             ) : data.expenses.length === 0 ? (
@@ -400,11 +399,11 @@ export default function MeuFinanceiroPage() {
       {isExpenseModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4 overflow-y-auto">
           <div className="bg-zinc-900 border border-zinc-700 w-full max-w-sm rounded-xl shadow-2xl overflow-hidden my-auto">
-            <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-black/50 sticky top-0">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2"><Receipt className="text-[#FFD700]" /> Novo Gasto Pessoal</h3>
+            <div className="p-4 md:p-6 border-b border-zinc-800 flex justify-between items-center bg-black/50 sticky top-0">
+              <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2"><Receipt className="text-[#FFD700]" /> Novo Gasto</h3>
               <button onClick={() => setIsExpenseModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl">&times;</button>
             </div>
-            <form onSubmit={handleSaveExpense} className="p-6 space-y-4">
+            <form onSubmit={handleSaveExpense} className="p-4 md:p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-1">Do que se trata?</label>
                 <input type="text" required value={expDesc} onChange={(e) => setExpDesc(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700]" placeholder="Ex: Máquina nova, lâminas..." />
@@ -413,9 +412,9 @@ export default function MeuFinanceiroPage() {
                 <label className="block text-sm font-medium text-zinc-400 mb-1">Valor Gasto (R$)</label>
                 <input type="number" step="0.01" required value={expAmount} onChange={(e) => setExpAmount(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700]" placeholder="50.00" />
               </div>
-              <div className="pt-4 flex gap-3 border-t border-zinc-800 mt-4">
-                <button type="button" onClick={() => setIsExpenseModalOpen(false)} className="flex-1 py-3 bg-zinc-800 text-white font-bold rounded-lg transition-colors hover:bg-zinc-700">Cancelar</button>
-                <button type="submit" disabled={isSubmitting} className="flex-1 py-3 bg-[#FFD700] hover:bg-yellow-500 text-black font-bold rounded-lg transition-colors disabled:opacity-50">
+              <div className="pt-4 flex flex-col sm:flex-row gap-3 border-t border-zinc-800 mt-4">
+                <button type="button" onClick={() => setIsExpenseModalOpen(false)} className="w-full py-3 bg-zinc-800 text-white font-bold rounded-lg transition-colors hover:bg-zinc-700">Cancelar</button>
+                <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-[#FFD700] hover:bg-yellow-500 text-black font-bold rounded-lg transition-colors disabled:opacity-50">
                   {isSubmitting ? 'Salvando...' : 'Registrar'}
                 </button>
               </div>
