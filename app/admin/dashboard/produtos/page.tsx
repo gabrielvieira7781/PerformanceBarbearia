@@ -17,7 +17,6 @@ export default function ProdutosPage() {
   const [products, setProducts] = useState<ProductType[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Estados do formulário
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -72,14 +71,13 @@ export default function ProdutosPage() {
     setError('');
   };
 
-  // Botão Mágico: Sugere um estoque mínimo baseado em uma margem de segurança de 20%
   const handleAutoSuggestMinStock = () => {
     const currentStock = Number(stock);
     if (currentStock > 0) {
       const suggested = Math.max(3, Math.ceil(currentStock * 0.2));
       setMinStock(suggested.toString());
     } else {
-      setMinStock('3'); // Mínimo de segurança padrão
+      setMinStock('3'); 
     }
   };
 
@@ -191,27 +189,26 @@ export default function ProdutosPage() {
     }
   };
 
-  // Cálculo de Margem de Lucro em Tempo Real para o formulário
   const calculatedProfit = Number(price.replace(',','.')) - Number(costPrice.replace(',','.'));
   const calculatedMargin = Number(price) > 0 ? (calculatedProfit / Number(price.replace(',','.'))) * 100 : 0;
 
   return (
-    <div className="p-8">
-      <header className="mb-8 border-b border-zinc-800 pb-4">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+      <header className="mb-6 md:mb-8 border-b border-zinc-800 pb-4">
+        <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
           <Package className="text-[#FFD700]" size={32} />
           Estoque e Compras
         </h1>
-        <p className="text-zinc-400 mt-2">
+        <p className="text-zinc-400 mt-2 text-sm md:text-base">
           Controle seu inventário físico, margens de lucro e receba alertas de reposição.
         </p>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
         {/* Formulário */}
         <div className="lg:col-span-1">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 sticky top-6">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5 md:p-6 sticky top-6">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               {editingId ? (
                 <><Pencil className="text-[#FFD700]" size={20} /> Editar Produto</>
@@ -235,7 +232,7 @@ export default function ProdutosPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4 border-t border-zinc-800/50 pt-4 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-zinc-800/50 pt-4 mt-2">
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">Preço de Custo</label>
                   <input
@@ -258,11 +255,10 @@ export default function ProdutosPage() {
                 </div>
               </div>
 
-              {/* Box de Lucro Automático */}
               {(Number(price) > 0 && Number(costPrice) > 0) && (
                 <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded flex items-center justify-between text-xs animation-scale-up">
                   <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                    <TrendingUp size={14} /> Lucro Líquido Estimado:
+                    <TrendingUp size={14} /> Lucro Líquido:
                   </div>
                   <span className="text-emerald-400 font-bold">
                     R$ {calculatedProfit.toFixed(2)} ({calculatedMargin.toFixed(0)}%)
@@ -270,7 +266,7 @@ export default function ProdutosPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4 border-t border-zinc-800/50 pt-4 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-zinc-800/50 pt-4 mt-2">
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">Estoque Físico</label>
                   <input
@@ -316,7 +312,7 @@ export default function ProdutosPage() {
                 </div>
               )}
 
-              <div className="pt-2 flex flex-col gap-2">
+              <div className="pt-2 flex flex-col gap-3">
                 <button
                   type="submit"
                   disabled={isSubmitting}
@@ -339,9 +335,9 @@ export default function ProdutosPage() {
           </div>
         </div>
 
-        {/* Tabela de Produtos com Alerta */}
+        {/* Tabela de Produtos */}
         <div className="lg:col-span-2">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5 md:p-6">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <Tag className="text-[#FFD700]" size={20} />
               Produtos Cadastrados
@@ -356,11 +352,11 @@ export default function ProdutosPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse min-w-[500px]">
                   <thead>
                     <tr className="border-b border-zinc-800">
                       <th className="py-3 px-4 text-zinc-400 font-medium">Produto / Custo</th>
-                      <th className="py-3 px-4 text-zinc-400 font-medium text-center">Status Estoque</th>
+                      <th className="py-3 px-4 text-zinc-400 font-medium text-center">Estoque</th>
                       <th className="py-3 px-4 text-zinc-400 font-medium text-right">Preço Venda</th>
                       <th className="py-3 px-4 text-zinc-400 font-medium text-center w-28">Ações</th>
                     </tr>
@@ -368,12 +364,10 @@ export default function ProdutosPage() {
                   <tbody>
                     {products.map((product) => {
                       const isLowStock = product.stock <= product.minStock;
-                      
                       return (
                       <tr key={product.id} className={`border-b border-zinc-800/50 transition-colors ${!product.isActive ? 'opacity-50' : 'hover:bg-zinc-800/20'} ${isLowStock && product.isActive ? 'bg-red-500/5' : ''}`}>
-                        
                         <td className="py-4 px-4">
-                          <div className="text-white font-medium flex items-center gap-2">
+                          <div className="text-white font-medium flex flex-wrap items-center gap-2">
                             {product.name}
                             {!product.isActive && <span className="bg-red-500/20 text-red-500 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Inativo</span>}
                           </div>
@@ -402,10 +396,10 @@ export default function ProdutosPage() {
                         
                         <td className="py-4 px-4">
                           <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => handleEditClick(product)} className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded transition-colors" title="Editar">
+                            <button onClick={() => handleEditClick(product)} className="p-2 md:p-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded transition-colors" title="Editar">
                               <Pencil size={16} />
                             </button>
-                            <button onClick={() => handleDeleteClick(product.id)} className="p-2 bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-500 rounded transition-colors" title="Excluir">
+                            <button onClick={() => handleDeleteClick(product.id)} className="p-2 md:p-2.5 bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-500 rounded transition-colors" title="Excluir">
                               <Trash2 size={16} />
                             </button>
                           </div>

@@ -1,4 +1,3 @@
-// app/admin/dashboard/financeiro/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -40,7 +39,6 @@ export default function FinanceiroPage() {
   const [records, setRecords] = useState<FinancialRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ================= FILTROS INTELIGENTES =================
   const [datePreset, setDatePreset] = useState('MES');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -60,7 +58,7 @@ export default function FinanceiroPage() {
     } else if (type === 'SEMANA') {
       const first = new Date(localDate);
       const day = first.getDay();
-      const diff = first.getDate() - day + (day === 0 ? -6 : 1); // Segunda-feira
+      const diff = first.getDate() - day + (day === 0 ? -6 : 1);
       first.setDate(diff);
       const last = new Date(first);
       last.setDate(first.getDate() + 6);
@@ -91,7 +89,6 @@ export default function FinanceiroPage() {
     applyDatePreset('MES');
   }, [applyDatePreset]);
 
-  // ================= ESTADOS DOS MODAIS =================
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<BarberReport | null>(null);
   
@@ -148,9 +145,7 @@ export default function FinanceiroPage() {
     if (activeTab === 'DESPESAS' || activeTab === 'RESUMO') fetchRecords();
   }, [activeTab]);
 
-  // ================= FILTRAGEM DOS DADOS =================
   const filteredRecords = records.filter(r => {
-    // 1. Filtro de Data
     let recordDate = r.createdAt?.split('T')[0];
     if (r.type === 'EXPENSE') {
       recordDate = r.paidAt ? r.paidAt.split('T')[0] : (r.dueDate ? r.dueDate.split('T')[0] : recordDate);
@@ -163,12 +158,10 @@ export default function FinanceiroPage() {
       if (endDate && recordDate > endDate) return false;
     }
 
-    // 2. Filtro de Status
     if (statusFilter !== 'TODOS') {
       if (r.status !== statusFilter) return false;
     }
 
-    // 3. Filtro de Método de Pagamento
     if (methodFilter !== 'TODOS') {
       const recordMethod = r.paymentMethod || '';
       const desc = r.description.toLowerCase();
@@ -181,7 +174,6 @@ export default function FinanceiroPage() {
     return true;
   });
 
-  // ================= CÁLCULOS DO RESUMO =================
   const faturamentoTotal = filteredRecords.filter(r => r.type === 'INCOME').reduce((a, b) => a + b.amount, 0);
   const recebido = filteredRecords.filter(r => r.type === 'INCOME' && r.status !== 'PENDING').reduce((a, b) => a + b.amount, 0); 
   const aReceber = filteredRecords.filter(r => r.type === 'INCOME' && r.status === 'PENDING').reduce((a, b) => a + b.amount, 0); 
@@ -190,9 +182,7 @@ export default function FinanceiroPage() {
   const pendingExpensesAmount = filteredRecords.filter(r => r.type === 'EXPENSE' && r.status === 'PENDING').reduce((a, b) => a + b.amount, 0);
   const pendingCommissionsAmount = reports.reduce((acc, rep) => acc + rep.commissionValue, 0);
   
-  // Total que falta sair do caixa
   const aPagar = pendingExpensesAmount + pendingCommissionsAmount;
-
   const saldoReal = recebido - pago;
   const saldoPrevisto = saldoReal + aReceber - aPagar;
 
@@ -203,7 +193,6 @@ export default function FinanceiroPage() {
   const pendingExpensesList = filteredRecords.filter(r => r.type === 'EXPENSE' && r.status === 'PENDING' && !r.description.includes('Comissão'));
   const paidExpensesList = filteredRecords.filter(r => r.type === 'EXPENSE' && r.status === 'PAID' && !r.description.includes('Comissão'));
 
-  // ================= AÇÕES E MODAIS =================
   const openPaymentModal = (report: BarberReport) => {
     setSelectedReport(report);
     setIsModalOpen(true);
@@ -324,21 +313,19 @@ export default function FinanceiroPage() {
         </div>
       )}
 
-      <header className="mb-6 border-b border-zinc-800 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
-            <Wallet className="text-[#FFD700]" size={32} />
-            Gestão Financeira
-          </h1>
-          <p className="text-zinc-400 mt-2 text-sm md:text-base">
-            Controle de caixa, lucros, despesas fixas e comissões da barbearia.
-          </p>
-        </div>
+      <header className="mb-6 border-b border-zinc-800 pb-4">
+        <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+          <Wallet className="text-[#FFD700]" size={32} />
+          Gestão Financeira
+        </h1>
+        <p className="text-zinc-400 mt-2 text-sm md:text-base">
+          Controle de caixa, lucros, despesas fixas e comissões da barbearia.
+        </p>
       </header>
 
       {/* ================= BARRA DE FILTROS ================= */}
       <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row flex-wrap gap-4 items-end animate-in fade-in">
-        <div className="flex-1 min-w-[150px]">
+        <div className="flex-1 min-w-[140px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1 flex items-center gap-1"><Calendar size={12}/> Período</label>
           <select 
             value={datePreset} 
@@ -356,17 +343,17 @@ export default function FinanceiroPage() {
           </select>
         </div>
         
-        <div className="flex-1 min-w-[130px]">
+        <div className="flex-1 min-w-[130px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Data Inicial</label>
           <input type="date" disabled={datePreset !== 'CUSTOM'} value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] disabled:opacity-50 text-sm" />
         </div>
         
-        <div className="flex-1 min-w-[130px]">
+        <div className="flex-1 min-w-[130px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Data Final</label>
           <input type="date" disabled={datePreset !== 'CUSTOM'} value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] disabled:opacity-50 text-sm" />
         </div>
 
-        <div className="flex-1 min-w-[140px]">
+        <div className="flex-1 min-w-[140px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1 flex items-center gap-1"><Filter size={12}/> Situação</label>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] text-sm">
             <option value="TODOS">Todos</option>
@@ -375,7 +362,7 @@ export default function FinanceiroPage() {
           </select>
         </div>
 
-        <div className="flex-1 min-w-[140px]">
+        <div className="flex-1 min-w-[140px] w-full">
           <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1 flex items-center gap-1"><DollarSign size={12}/> Método</label>
           <select value={methodFilter} onChange={e => setMethodFilter(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg px-3 py-2 outline-none focus:border-[#FFD700] text-sm">
             <option value="TODOS">Todos</option>
@@ -403,38 +390,28 @@ export default function FinanceiroPage() {
       {/* ================= ABA RESUMO GERAL ================= */}
       {activeTab === 'RESUMO' && (
         <div className="space-y-8 animate-in fade-in duration-500">
-          
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* CARD FATURAMENTO */}
             <div className="bg-zinc-900 p-5 rounded-xl border border-[#FFD700]/30 shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-3 opacity-5"><PieChart size={64}/></div>
                 <p className="text-xs text-[#FFD700] font-bold uppercase mb-2 flex items-center gap-2"><Tag size={16}/> Faturamento</p>
                 <h3 className="text-2xl font-bold text-white">R$ {faturamentoTotal.toFixed(2)}</h3>
                 <p className="text-[10px] text-zinc-500 mt-2 leading-tight">Total bruto gerado no período</p>
             </div>
-
-            {/* CARD RECEITAS */}
             <div className="bg-zinc-900 p-5 rounded-xl border border-zinc-800 shadow-lg">
                 <p className="text-xs text-emerald-400 font-bold uppercase mb-2 flex items-center gap-2"><ArrowUpCircle size={16}/> Recebido</p>
                 <h3 className="text-2xl font-bold text-white">R$ {recebido.toFixed(2)}</h3>
                 <p className="text-[10px] text-zinc-500 mt-2">A receber: R$ {aReceber.toFixed(2)}</p>
             </div>
-
-            {/* CARD DESPESAS */}
             <div className="bg-zinc-900 p-5 rounded-xl border border-zinc-800 shadow-lg">
                 <p className="text-xs text-red-400 font-bold uppercase mb-2 flex items-center gap-2"><ArrowDownCircle size={16}/> Pago</p>
                 <h3 className="text-2xl font-bold text-white">R$ {pago.toFixed(2)}</h3>
                 <p className="text-[10px] text-zinc-500 mt-2">Contas a pagar: R$ {aPagar.toFixed(2)}</p>
             </div>
-
-            {/* CARD SALDO REAL */}
             <div className="bg-zinc-900 p-5 rounded-xl border border-zinc-800 shadow-lg">
                 <p className="text-xs text-blue-400 font-bold uppercase mb-2 flex items-center gap-2"><DollarSign size={16}/> Saldo Real</p>
                 <h3 className={`text-2xl font-bold ${saldoReal >= 0 ? 'text-blue-400' : 'text-red-500'}`}>R$ {saldoReal.toFixed(2)}</h3>
-                <p className="text-[10px] text-zinc-500 mt-2">Disponível em caixa (Recebido - Pago)</p>
+                <p className="text-[10px] text-zinc-500 mt-2">Disponível em caixa</p>
             </div>
-
-            {/* CARD PREVISÃO */}
             <div className="bg-zinc-900 p-5 rounded-xl border border-zinc-800 shadow-lg sm:col-span-2 lg:col-span-1">
                 <p className="text-xs text-orange-400 font-bold uppercase mb-2 flex items-center gap-2"><Calendar size={16}/> Previsão Final</p>
                 <h3 className={`text-2xl font-bold ${saldoPrevisto >= 0 ? 'text-orange-400' : 'text-red-500'}`}>R$ {saldoPrevisto.toFixed(2)}</h3>
@@ -453,8 +430,8 @@ export default function FinanceiroPage() {
                     <h3 className="font-bold uppercase tracking-wider">Entradas Concluídas</h3>
                   </div>
                   <div className="flex justify-between items-center border-t border-zinc-800 pt-4 mt-4">
-                    <span className="text-zinc-400">Serviços e Vendas Recebidas</span>
-                    <span className="text-white font-mono text-xl">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(recebido)}</span>
+                    <span className="text-zinc-400">Serviços e Vendas</span>
+                    <span className="text-white font-mono text-xl md:text-2xl">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(recebido)}</span>
                   </div>
                 </div>
 
@@ -469,11 +446,11 @@ export default function FinanceiroPage() {
                       <span className="text-red-400 font-mono text-sm">- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCommissions)}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-sm">Despesas Fixas Pagas</span>
+                      <span className="text-zinc-400 text-sm">Despesas Fixas</span>
                       <span className="text-red-400 font-mono text-sm">- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalFixed)}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-sm">Despesas Variáveis Pagas</span>
+                      <span className="text-zinc-400 text-sm">Despesas Variáveis</span>
                       <span className="text-red-400 font-mono text-sm">- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalVariable)}</span>
                     </div>
                   </div>
@@ -496,9 +473,9 @@ export default function FinanceiroPage() {
                         <span className="text-yellow-500 font-mono text-sm">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pendingExpensesAmount)}</span>
                       </div>
                     </div>
-                    <div className="pt-4 mt-4 border-t border-yellow-500/20 flex justify-between items-center">
+                    <div className="pt-4 mt-4 border-t border-yellow-500/20 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                         <span className="text-yellow-500 font-bold uppercase text-sm">Total Comprometido</span>
-                        <span className="text-yellow-500 font-black font-mono text-xl">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(aPagar)}</span>
+                        <span className="text-yellow-500 font-black font-mono text-xl md:text-2xl">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(aPagar)}</span>
                     </div>
                   </div>
               </div>
@@ -514,7 +491,7 @@ export default function FinanceiroPage() {
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex gap-3">
             <AlertCircle className="text-blue-400 shrink-0" />
             <p className="text-sm text-blue-200">
-              O sistema calcula automaticamente as comissões pendentes (independente do filtro de data). Ao pagar, o valor é debitado do Fluxo de Caixa.
+              O sistema calcula automaticamente as comissões pendentes. Ao pagar, o valor é debitado do Fluxo de Caixa.
             </p>
           </div>
 
@@ -532,7 +509,7 @@ export default function FinanceiroPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {reports.map((report) => (
                 <div key={report.barber.id} className="bg-black border border-zinc-800 rounded-xl overflow-hidden shadow-lg flex flex-col">
-                  <div className="p-5 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-start">
+                  <div className="p-5 border-b border-zinc-800 bg-zinc-900/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-lg text-[#FFD700] font-bold shrink-0">
                         {report.barber.name.charAt(0).toUpperCase()}
@@ -544,7 +521,7 @@ export default function FinanceiroPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-left sm:text-right">
                       <span className="text-[#FFD700] font-black text-lg block">{report.barber.commissionRate}%</span>
                       <span className="text-zinc-500 text-[10px] uppercase">Comissão</span>
                     </div>
@@ -552,7 +529,7 @@ export default function FinanceiroPage() {
 
                   <div className="p-5 space-y-4 flex-1">
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-zinc-400 flex items-center gap-2"><Scissors size={14}/> Serviços Pendentes:</span>
+                      <span className="text-zinc-400 flex items-center gap-2"><Scissors size={14}/> Pendentes:</span>
                       <span className="text-white font-medium">{report.servicesCount} cortes</span>
                     </div>
                     
@@ -586,9 +563,9 @@ export default function FinanceiroPage() {
       {/* ================= ABA DESPESAS ================= */}
       {activeTab === 'DESPESAS' && (
         <div className="space-y-6 animate-in fade-in duration-500">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h2 className="text-xl font-bold text-white">Lançamentos</h2>
-            <button onClick={() => openExpenseModal()} className="bg-[#FFD700] text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 transition-all text-sm flex items-center gap-2">
+            <button onClick={() => openExpenseModal()} className="bg-[#FFD700] w-full sm:w-auto justify-center text-black font-bold px-4 py-3 sm:py-2 rounded-lg hover:bg-yellow-500 transition-all text-sm flex items-center gap-2">
               <Plus size={16} /> Novo Lançamento
             </button>
           </div>
@@ -607,25 +584,25 @@ export default function FinanceiroPage() {
                   {pendingExpensesList.length === 0 ? (
                     <p className="text-zinc-500 text-sm">Nenhum registro pendente no filtro selecionado.</p>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {pendingExpensesList.map(exp => (
-                        <div key={exp.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex justify-between items-center shadow-lg group">
-                          <div>
+                        <div key={exp.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col sm:flex-row md:justify-between items-start sm:items-center gap-4 shadow-lg group">
+                          <div className="w-full">
                             <p className="text-white font-bold">{exp.description}</p>
                             <p className="text-red-400 text-xs mt-1">Vence em: {new Date(exp.dueDate).toLocaleDateString('pt-BR')}</p>
-                            <div className="flex gap-2 mt-2">
+                            <div className="flex flex-wrap gap-2 mt-2">
                               <span className={`text-[9px] px-2 py-0.5 rounded border uppercase font-bold inline-block ${exp.category === 'FIXA' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
                                 Despesa {exp.category}
                               </span>
                               {exp.paymentMethod && <span className="text-[9px] px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-300 uppercase font-bold inline-block">{exp.paymentMethod}</span>}
                             </div>
                           </div>
-                          <div className="text-right flex flex-col items-end">
-                            <p className="text-white font-mono font-bold mb-3 text-lg">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(exp.amount)}</p>
-                            <div className="flex gap-2">
-                              <button onClick={() => openExpenseModal(exp, false)} className="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-blue-400 rounded transition-colors" title="Editar"><Edit2 size={14}/></button>
-                              <button onClick={() => handleDeleteExpense(exp.id)} className="p-1.5 bg-zinc-800 hover:bg-red-500/20 text-red-500 rounded transition-colors" title="Excluir"><Trash2 size={14}/></button>
-                              <button onClick={() => openExpenseModal(exp, true)} className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold px-3 py-1.5 rounded uppercase transition-colors">Dar Baixa</button>
+                          <div className="text-left sm:text-right flex flex-col items-start sm:items-end w-full sm:w-auto">
+                            <p className="text-white font-mono font-bold mb-3 text-lg md:text-xl">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(exp.amount)}</p>
+                            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                              <button onClick={() => openExpenseModal(exp, false)} className="flex-1 sm:flex-none p-2 sm:p-1.5 bg-zinc-800 hover:bg-zinc-700 text-blue-400 rounded transition-colors flex justify-center" title="Editar"><Edit2 size={16} className="sm:w-[14px] sm:h-[14px]"/></button>
+                              <button onClick={() => handleDeleteExpense(exp.id)} className="flex-1 sm:flex-none p-2 sm:p-1.5 bg-zinc-800 hover:bg-red-500/20 text-red-500 rounded transition-colors flex justify-center" title="Excluir"><Trash2 size={16} className="sm:w-[14px] sm:h-[14px]"/></button>
+                              <button onClick={() => openExpenseModal(exp, true)} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] sm:text-[10px] font-bold px-3 py-2 sm:py-1.5 rounded uppercase transition-colors">Dar Baixa</button>
                             </div>
                           </div>
                         </div>
@@ -644,26 +621,26 @@ export default function FinanceiroPage() {
                   {paidExpensesList.length === 0 ? (
                     <p className="text-zinc-500 text-sm">Nenhum registro pago no filtro selecionado.</p>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {paidExpensesList.map(exp => (
-                        <div key={exp.id} className="bg-black border border-zinc-800 p-4 rounded-xl flex justify-between items-center opacity-80 hover:opacity-100 transition-opacity group">
-                          <div>
+                        <div key={exp.id} className="bg-black border border-zinc-800 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 opacity-100 sm:opacity-80 sm:hover:opacity-100 transition-opacity group">
+                          <div className="w-full">
                             <h3 className="text-white font-medium">{exp.description}</h3>
-                            <div className="flex gap-2 mt-1">
+                            <div className="flex flex-wrap gap-2 mt-2 sm:mt-1">
                               <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded inline-block ${exp.category === 'FIXA' ? 'bg-blue-500/20 text-blue-400' : 'bg-orange-500/20 text-orange-400'}`}>
                                 Despesa {exp.category}
                               </span>
                               {exp.paymentMethod && <span className="text-[9px] px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-300 uppercase font-bold inline-block">{exp.paymentMethod}</span>}
                             </div>
-                            <p className="text-zinc-500 text-[10px] mt-2">Venceu: {new Date(exp.dueDate).toLocaleDateString('pt-BR')} | <strong>Pago em: {exp.paidAt ? new Date(exp.paidAt).toLocaleDateString('pt-BR') : '-'}</strong></p>
+                            <p className="text-zinc-500 text-[10px] mt-2 leading-tight">Venceu: {new Date(exp.dueDate).toLocaleDateString('pt-BR')} <br className="sm:hidden" /> <strong className="sm:ml-1">Pago em: {exp.paidAt ? new Date(exp.paidAt).toLocaleDateString('pt-BR') : '-'}</strong></p>
                           </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <span className="text-red-400 font-mono font-bold">
+                          <div className="flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end w-full sm:w-auto gap-2 border-t border-zinc-800/50 sm:border-0 pt-3 sm:pt-0 mt-1 sm:mt-0">
+                            <span className="text-red-400 font-mono font-bold text-base md:text-md">
                               - {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(exp.amount)}
                             </span>
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => openExpenseModal(exp, false)} className="p-1 bg-zinc-800 hover:bg-zinc-700 text-blue-400 rounded" title="Editar"><Edit2 size={12}/></button>
-                              <button onClick={() => handleDeleteExpense(exp.id)} className="p-1 bg-zinc-800 hover:bg-red-500/20 text-red-500 rounded" title="Excluir"><Trash2 size={12}/></button>
+                            <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => openExpenseModal(exp, false)} className="p-2 sm:p-1 bg-zinc-800 hover:bg-zinc-700 text-blue-400 rounded" title="Editar"><Edit2 size={14} className="sm:w-[12px] sm:h-[12px]"/></button>
+                              <button onClick={() => handleDeleteExpense(exp.id)} className="p-2 sm:p-1 bg-zinc-800 hover:bg-red-500/20 text-red-500 rounded" title="Excluir"><Trash2 size={14} className="sm:w-[12px] sm:h-[12px]"/></button>
                             </div>
                           </div>
                         </div>
@@ -679,23 +656,22 @@ export default function FinanceiroPage() {
       )}
 
       {/* ================= MODAIS ================= */}
-      
       {isModalOpen && selectedReport && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4 overflow-y-auto">
           <div className="bg-zinc-900 border border-zinc-700 w-full max-w-lg rounded-xl shadow-2xl overflow-hidden my-auto">
-            <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-black/50 sticky top-0">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2"><HandCoins className="text-[#FFD700]" /> Acerto: {selectedReport.barber.name}</h3>
+            <div className="p-4 md:p-6 border-b border-zinc-800 flex justify-between items-center bg-black/50 sticky top-0">
+              <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2"><HandCoins className="text-[#FFD700]" /> Acerto</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl">&times;</button>
             </div>
-            <div className="p-6">
+            <div className="p-4 md:p-6">
               <div className="bg-black border border-zinc-800 rounded-lg p-4 mb-6">
-                <p className="text-zinc-400 text-sm mb-1">Total a transferir:</p>
-                <p className="text-4xl font-black text-[#FFD700]">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedReport.commissionValue)}</p>
+                <p className="text-zinc-400 text-sm mb-1">Total para: {selectedReport.barber.name}</p>
+                <p className="text-3xl md:text-4xl font-black text-[#FFD700]">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedReport.commissionValue)}</p>
               </div>
-              <div className="pt-6 flex gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 bg-zinc-800 text-white font-bold rounded-lg transition-colors">Cancelar</button>
-                <button onClick={handleProcessPayment} disabled={isSubmitting} className="flex-1 py-3 bg-[#FFD700] hover:bg-yellow-500 text-black font-bold rounded-lg transition-colors disabled:opacity-50">
-                  {isSubmitting ? 'Processando...' : 'Confirmar Pagamento'}
+              <div className="pt-2 md:pt-6 flex flex-col md:flex-row gap-3">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="w-full py-3 bg-zinc-800 text-white font-bold rounded-lg transition-colors">Cancelar</button>
+                <button onClick={handleProcessPayment} disabled={isSubmitting} className="w-full py-3 bg-[#FFD700] hover:bg-yellow-500 text-black font-bold rounded-lg transition-colors disabled:opacity-50">
+                  {isSubmitting ? 'Processando...' : 'Pagar Agora'}
                 </button>
               </div>
             </div>
@@ -706,19 +682,19 @@ export default function FinanceiroPage() {
       {isExpenseModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4 overflow-y-auto">
           <div className="bg-zinc-900 border border-zinc-700 w-full max-w-md rounded-xl shadow-2xl overflow-hidden my-auto">
-            <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-black/50 sticky top-0">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <div className="p-4 md:p-6 border-b border-zinc-800 flex justify-between items-center bg-black/50 sticky top-0">
+              <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
                 <Receipt className="text-[#FFD700]" /> 
                 {editingExpenseId ? (expStatus === 'PAID' ? 'Baixar/Editar' : 'Editar Conta') : 'Lançar Conta'}
               </h3>
               <button onClick={() => setIsExpenseModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl">&times;</button>
             </div>
-            <form onSubmit={handleSaveExpense} className="p-6 space-y-4">
+            <form onSubmit={handleSaveExpense} className="p-4 md:p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-1">Descrição</label>
                 <input type="text" value={expDesc} onChange={(e) => setExpDesc(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700]" placeholder="Ex: Conta de Energia" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-1">Valor Final (R$)</label>
                   <input type="number" step="0.01" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700]" placeholder="150.00" />
@@ -728,7 +704,7 @@ export default function FinanceiroPage() {
                   <input type="date" value={expDueDate} onChange={(e) => setExpDueDate(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700]" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-1">Categoria</label>
                   <select value={expCategory} onChange={(e) => setExpCategory(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700] appearance-none">
@@ -763,9 +739,9 @@ export default function FinanceiroPage() {
                 </div>
               )}
 
-              <div className="pt-4 flex gap-3 border-t border-zinc-800 mt-4">
-                <button type="button" onClick={() => setIsExpenseModalOpen(false)} className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-lg transition-colors">Cancelar</button>
-                <button type="submit" disabled={isSubmitting} className="flex-1 py-3 bg-[#FFD700] hover:bg-yellow-500 text-black font-bold rounded-lg transition-colors disabled:opacity-50">
+              <div className="pt-4 flex flex-col sm:flex-row gap-3 border-t border-zinc-800 mt-4">
+                <button type="button" onClick={() => setIsExpenseModalOpen(false)} className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-lg transition-colors">Cancelar</button>
+                <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-[#FFD700] hover:bg-yellow-500 text-black font-bold rounded-lg transition-colors disabled:opacity-50">
                   {isSubmitting ? 'Salvando...' : (editingExpenseId ? 'Salvar Alterações' : 'Lançar Conta')}
                 </button>
               </div>
