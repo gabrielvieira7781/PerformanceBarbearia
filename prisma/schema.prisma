@@ -169,7 +169,7 @@ model BarbershopSettings {
   barbershopId        String   @unique
   allowBarberExpenses Boolean  @default(false) // O botão de liga/desliga
 
-  whatsappInstanceName String? 
+  whatsappInstanceName String? @unique // O nome da instância na Evolution (Ex: barbearia_do_joao)
   whatsappApiKey       String? 
   isWhatsappConnected  Boolean @default(false)
   
@@ -182,7 +182,8 @@ model BarbershopSettings {
   enableStampsLoyalty     Boolean @default(false)
   stampsRequiredForReward Int     @default(10) // Ex: A cada 10 cortes
   stampRewardDescription  String  @default("1 Corte Grátis") // O que ele ganha
-  
+  whatsappToken           String?  // O token de segurança da instância
+  botEnabled              Boolean  @default(false) // Se o dono ligou ou desligou o robô
   updatedAt           DateTime @updatedAt
 }
 
@@ -235,4 +236,49 @@ model Appointment {
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model BotSession {
+  id           String   @id @default(cuid())
+  phone        String   @unique // O número do WhatsApp do cliente
+  barbershopId String   // Para saber de qual barbearia ele é cliente
+  clientId     String?  // Se já tivermos o cliente cadastrado, guardamos o ID dele aqui
+  
+  step         String   @default("START") // A etapa atual (Ex: SELECT_SERVICE, SELECT_TIME)
+  stateData    String?  @db.Text // Memória temporária (Guarda o serviço e o barbeiro que ele escolheu nos botões anteriores em formato JSON)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model BotFlowStep {
+  id            String   @id @default(cuid())
+  barbershopId  String
+  
+  keyword       String?  // Ex: "MENU", "START", "OI"
+  menuTitle     String   // O título que aparece na gaveta do WhatsApp
+  message       String   @db.Text // A mensagem que o robô envia
+  
+  options       BotFlowOption[] // Os botões dessa etapa
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BotFlowOption {
+  id            String   @id @default(cuid())
+  stepId        String
+  step          BotFlowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  label         String   // O texto do botão
+  description   String?  // Aquela letrinha miúda embaixo do botão
+  
+  actionType    String   // Pode ser: "MENSAGEM", "PROXIMA_ETAPA" ou "ACAO_SISTEMA"
+  
+  finalMessage  String?  @db.Text // Se ele escolheu MENSAGEM
+  nextStepId    String?  // Se ele escolheu ir para outra etapa
+  systemAction  String?  // Se ele escolheu "ACAO_SISTEMA" (ex: "START_SCHEDULING")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  LayoutDashboard, Scissors, Users, Wallet, MessageSquare, Settings, LogOut, PlayCircle, Crown, Menu, X, Boxes
+  LayoutDashboard, Scissors, Users, Wallet, MessageSquare, Settings, LogOut, PlayCircle, Crown, Menu, X, Boxes, Waypoints
 } from 'lucide-react';
 
 export default function AdminDashboardLayout({
@@ -38,6 +38,7 @@ export default function AdminDashboardLayout({
     { name: 'Gestão de Equipe',     href: '/admin/dashboard/equipe',        icon: Users },
     { name: 'Automação WhatsApp',   href: '/admin/dashboard/mensagens',     icon: MessageSquare },
     { name: 'Financeiro',   href: '/admin/dashboard/financeiro',    icon: Wallet },
+    { name: 'Fluxos', href: '/dashboard/fluxos', icon: Waypoints },
     { name: 'Configurações',        href: '/admin/dashboard/configuracoes', icon: Settings },
   ];
 
