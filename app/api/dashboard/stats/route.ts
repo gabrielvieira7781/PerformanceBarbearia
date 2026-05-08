@@ -1,5 +1,3 @@
-// app/api/dashboard/stats/route.ts
-
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import jwt from 'jsonwebtoken';
@@ -41,9 +39,7 @@ export async function GET(request: Request) {
         const end = endDate ? new Date(`${endDate}T23:59:59.999-03:00`) : new Date();
 
         // MÁGICA DA PERMISSÃO: 
-        // Se for ADMIN ou tiver a permissão, ele pode ver tudo (finalBarberId fica vazio a não ser que ele filtre no select)
-        // Se for BARBER comum, travamos a busca no ID dele (user.id)
-        const hasPermission = user.role === 'ADMIN' || user.permissions.includes('view_all_stats') || user.permissions.includes('admin_panel');
+        const hasPermission = user.role === 'ADMIN' || user.permissions?.includes('view_all_stats') || user.permissions?.includes('admin_panel');
         const finalBarberId = hasPermission ? (filterBarberId || undefined) : user.id;
 
         // Monta o filtro do banco de dados
@@ -56,13 +52,15 @@ export async function GET(request: Request) {
             whereClause.userId = finalBarberId;
         }
 
-        // 1. Busca os Logs de Serviço
+        // 1. Busca os Logs de Serviço (CORREÇÃO APLICADA AQUI)
         const logs = await prisma.serviceLog.findMany({
             where: whereClause,
             include: {
-                client: { select: { name: true } },
-                serviceType: { select: { name: true } },
-                user: { select: { name: true } }
+                // Agora enviamos o ID e o NOME para o Modal de Edição funcionar perfeitamente!
+                client: { select: { id: true, name: true } },
+                serviceType: { select: { id: true, name: true, price: true } },
+                product: { select: { id: true, name: true, price: true } }, // Adicionado para puxar nomes de produtos
+                user: { select: { id: true, name: true } }
             },
             orderBy: { date: 'desc' }
         });
