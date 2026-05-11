@@ -32,7 +32,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Dados incompletos para o checkout.' }, { status: 400 });
         }
 
-        let cleanPhone = clientPhone ? clientPhone.replace(/\D/g, '') : '';
+        // PROTEÇÃO 1: Trocando a string vazia '' por null. O Prisma aceita múltiplos nulls sem dar erro de duplicidade.
+        let cleanPhone = clientPhone ? clientPhone.replace(/\D/g, '') : null;
         let client = null;
 
         if (cleanPhone) {
@@ -60,18 +61,20 @@ export async function POST(request: Request) {
             include: { plan: { include: { services: true } } }
         });
 
-        const subtotal = cart.reduce((acc: number, item: any) => acc + Number(item.price), 0);
+        // PROTEÇÃO 2: Adicionando || 0 para impedir que um preço vazio quebre a soma transformando o subtotal em NaN
+        const subtotal = cart.reduce((acc: number, item: any) => acc + (Number(item.price) || 0), 0);
         const discountValue = Number(discount) || 0;
         let usedPlanCount = 0; 
         
         let servicesCount = 0; 
 
         for (const item of cart) {
-            let finalPrice = Number(item.price);
+            // PROTEÇÃO 3: Blindando o preço final do item contra NaN antes de salvar no ServiceLog
+            let finalPrice = Number(item.price) || 0;
             let itemPaymentMethod = paymentMethod;
 
             if (discountValue > 0 && subtotal > 0) {
-                const itemDiscount = (Number(item.price) / subtotal) * discountValue;
+                const itemDiscount = ((Number(item.price) || 0) / subtotal) * discountValue;
                 finalPrice = Math.max(0, finalPrice - itemDiscount);
             }
 
