@@ -24,7 +24,7 @@ export async function GET() {
         if (!barbershopId) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
 
         const team = await prisma.user.findMany({
-            where: { barbershopId: barbershopId, role: 'BARBER' },
+            where: { barbershopId: barbershopId },
             select: {
                 id: true,
                 name: true,
@@ -32,8 +32,14 @@ export async function GET() {
                 createdAt: true,
                 isActive: true,
                 permissions: true,
-                commissionRate: true, // NOVO
-                paymentCycle: true    // NOVO
+                commissionRate: true, 
+                paymentCycle: true,
+                // ==== ADICIONADOS PARA A COROA E O WHATSAPP ====
+                role: true, 
+                phone: true,
+                whatsappInstanceName: true,
+                isWhatsappConnected: true,
+                // ===============================================
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -50,7 +56,7 @@ export async function POST(request: Request) {
         if (!barbershopId) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
 
         const body = await request.json();
-        const { name, email, password, permissions, commissionRate, paymentCycle } = body;
+        const { name, email, password, permissions, commissionRate, paymentCycle, phone } = body;
 
         if (!name || !email || !password) {
             return NextResponse.json({ message: 'Nome, e-mail e senha são obrigatórios.' }, { status: 400 });
@@ -74,9 +80,21 @@ export async function POST(request: Request) {
                 barbershopId: barbershopId,
                 permissions: permissions || [],
                 commissionRate: Number(commissionRate) || 50,
-                paymentCycle: paymentCycle || 'WEEKLY'
+                paymentCycle: paymentCycle || 'WEEKLY',
+                // Deixa o telefone salvo caso você queira preencher manualmente no futuro
+                phone: phone || null 
             },
-            select: { id: true, name: true, email: true, isActive: true, permissions: true, commissionRate: true, paymentCycle: true }
+            select: { 
+                id: true, 
+                name: true, 
+                email: true, 
+                isActive: true, 
+                permissions: true, 
+                commissionRate: true, 
+                paymentCycle: true,
+                role: true, // Garante que o frontend saiba a role ao cadastrar
+                phone: true 
+            }
         });
 
         return NextResponse.json(newBarber, { status: 201 });

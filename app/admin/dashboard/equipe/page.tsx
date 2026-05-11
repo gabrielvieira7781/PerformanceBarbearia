@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, Pencil, X, Trash2, KeyRound, Shield, Percent, CalendarClock } from 'lucide-react';
+import { Plus, Users, Pencil, X, Trash2, KeyRound, Shield, Percent, CalendarClock, Crown } from 'lucide-react';
 
 interface Barber {
   id: string;
@@ -12,6 +12,7 @@ interface Barber {
   permissions: string[];
   commissionRate: number;
   paymentCycle: string;
+  role: string;
 }
 
 const AVAILABLE_PERMISSIONS = [
@@ -109,6 +110,11 @@ export default function EquipePage() {
 
   const handleToggleStatus = async (barber: Barber) => {
     if (!canManageTeam) return;
+    if (barber.role?.toUpperCase() === 'ADMIN') {
+      setError('Você não pode bloquear o acesso do dono da barbearia.');
+      return;
+    }
+
     setError('');
     setSuccess('');
     const newStatus = !barber.isActive;
@@ -345,12 +351,19 @@ export default function EquipePage() {
                   {team.map((barber) => (
                     <div key={barber.id} className={`bg-black border border-zinc-800 rounded-lg p-4 flex flex-col gap-4 ${!barber.isActive ? 'opacity-60' : ''}`}>
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-lg text-[#FFD700] font-bold shrink-0">
+                        <div className={`w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-lg text-[#FFD700] font-bold shrink-0 ${barber.role?.toUpperCase() === 'ADMIN' ? 'border-2 border-[#FFD700]' : ''}`}>
                           {barber.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="overflow-hidden">
-                          <p className="text-white font-medium truncate">{barber.name}</p>
-                          <p className="text-zinc-500 text-xs truncate">{barber.email}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-white font-medium truncate">{barber.name}</p>
+                            {barber.role?.toUpperCase() === 'ADMIN' && (
+                              <span title="Dono da Barbearia" className="flex items-center gap-1 text-[#FFD700] bg-[#FFD700]/10 border border-[#FFD700]/20 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider">
+                                <Crown size={12} /> DONO
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-zinc-500 text-xs truncate mt-0.5">{barber.email}</p>
                         </div>
                       </div>
                       
@@ -362,7 +375,11 @@ export default function EquipePage() {
                       <div className="flex items-center justify-between border-t border-zinc-800/50 pt-3">
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-zinc-500 font-bold uppercase">Status:</span>
-                          <div onClick={() => handleToggleStatus(barber)} className={`w-11 h-6 rounded-full relative flex items-center px-0.5 transition-colors duration-300 ${canManageTeam ? 'cursor-pointer' : 'cursor-default'}`} style={{ backgroundColor: barber.isActive ? '#22c55e' : '#3f3f46' }}>
+                          <div 
+                            onClick={() => handleToggleStatus(barber)} 
+                            className={`w-11 h-6 rounded-full relative flex items-center px-0.5 transition-colors duration-300 ${canManageTeam && barber.role?.toUpperCase() !== 'ADMIN' ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`} 
+                            style={{ backgroundColor: barber.isActive ? '#22c55e' : '#3f3f46' }}
+                          >
                             <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${barber.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
                           </div>
                         </div>
@@ -372,9 +389,12 @@ export default function EquipePage() {
                             <button onClick={() => handleEditClick(barber)} className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded transition-colors" title="Editar">
                               <KeyRound size={16} />
                             </button>
-                            <button onClick={() => handleDeleteClick(barber.id)} className="p-2 bg-zinc-800 hover:bg-red-500/20 text-red-500 rounded transition-colors" title="Excluir">
-                              <Trash2 size={16} />
-                            </button>
+                            {/* O Dono não pode excluir a si mesmo */}
+                            {barber.role?.toUpperCase() !== 'ADMIN' && (
+                              <button onClick={() => handleDeleteClick(barber.id)} className="p-2 bg-zinc-800 hover:bg-red-500/20 text-red-500 rounded transition-colors" title="Excluir">
+                                <Trash2 size={16} />
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -397,11 +417,18 @@ export default function EquipePage() {
                       {team.map((barber) => (
                         <tr key={barber.id} className={`border-b border-zinc-800/50 transition-colors hover:bg-zinc-800/20 ${!barber.isActive ? 'opacity-50' : ''}`}>
                           <td className="py-4 px-4 text-white font-medium flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-[#FFD700] font-bold">
+                            <div className={`w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-[#FFD700] font-bold ${barber.role?.toUpperCase() === 'ADMIN' ? 'border border-[#FFD700]' : ''}`}>
                               {barber.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p>{barber.name}</p>
+                              <div className="flex items-center gap-2">
+                                <p>{barber.name}</p>
+                                {barber.role?.toUpperCase() === 'ADMIN' && (
+                                  <span title="Dono da Barbearia" className="flex items-center gap-1 text-[10px] bg-[#FFD700]/10 text-[#FFD700] px-1.5 py-0.5 rounded font-bold tracking-wider border border-[#FFD700]/30">
+                                    <Crown size={10} /> DONO
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-zinc-500 text-xs font-normal">{barber.email}</p>
                             </div>
                           </td>
@@ -415,7 +442,12 @@ export default function EquipePage() {
 
                           <td className="py-4 px-4">
                             <div className="flex justify-center">
-                              <div onClick={() => handleToggleStatus(barber)} title={barber.isActive ? "Acesso liberado" : "Acesso bloqueado"} className={`w-11 h-6 rounded-full relative flex items-center px-0.5 transition-colors duration-300 ${canManageTeam ? 'cursor-pointer' : 'cursor-default'}`} style={{ backgroundColor: barber.isActive ? '#22c55e' : '#3f3f46' }}>
+                              <div 
+                                onClick={() => handleToggleStatus(barber)} 
+                                title={barber.role?.toUpperCase() === 'ADMIN' ? "O dono não pode ser bloqueado" : barber.isActive ? "Acesso liberado" : "Acesso bloqueado"} 
+                                className={`w-11 h-6 rounded-full relative flex items-center px-0.5 transition-colors duration-300 ${canManageTeam && barber.role?.toUpperCase() !== 'ADMIN' ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`} 
+                                style={{ backgroundColor: barber.isActive ? '#22c55e' : '#3f3f46' }}
+                              >
                                 <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${barber.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
                               </div>
                             </div>
@@ -427,9 +459,14 @@ export default function EquipePage() {
                                 <button onClick={() => handleEditClick(barber)} className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded transition-colors" title="Editar">
                                   <KeyRound size={16} />
                                 </button>
-                                <button onClick={() => handleDeleteClick(barber.id)} className="p-2 bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-500 rounded transition-colors" title="Remover">
-                                  <Trash2 size={16} />
-                                </button>
+                                {/* O Dono não pode excluir a si mesmo */}
+                                {barber.role?.toUpperCase() !== 'ADMIN' ? (
+                                  <button onClick={() => handleDeleteClick(barber.id)} className="p-2 bg-zinc-800 hover:bg-red-500/20 text-zinc-300 hover:text-red-500 rounded transition-colors" title="Remover">
+                                    <Trash2 size={16} />
+                                  </button>
+                                ) : (
+                                  <div className="w-8 h-8"></div>
+                                )}
                               </div>
                             </td>
                           )}

@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
 // Configurações da Evolution API (VPS)
-// Depois você pode colocar essas variáveis no seu arquivo .env
-const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || 'http://localhost:8080';
-const EVOLUTION_API_KEY = process.env.EVOLUTION_GLOBAL_KEY || 'sua_chave_global_aqui';
+const EVOLUTION_API_URL = process.env.EVOLUTION_URL || 'http://129.121.35.224:8080';
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'Performance2026Key!';
 
 // ==========================================
 // FUNÇÕES DE COMUNICAÇÃO COM O WHATSAPP
@@ -89,17 +88,29 @@ export async function POST(request: Request) {
             return NextResponse.json({ status: 'ignored' }, { status: 200 });
         }
 
-        // 2. BUSCA A BARBEARIA DONA DESTE WHATSAPP
-        const settings = await prisma.barbershopSettings.findUnique({
+        // 2. IDENTIFICA QUEM RECEBEU A MENSAGEM (Novo fluxo de Arquitetura SaaS)
+        // Procura qual usuário (barbeiro ou dono) é o dono dessa instância do WhatsApp
+        const userReceiver = await prisma.user.findFirst({
             where: { whatsappInstanceName: instanceName }
-            // TIREI O include: { barbershop: true }
         });
 
-        if (!settings || !settings.botEnabled) {
-            return NextResponse.json({ status: 'bot_disabled_or_not_found' }, { status: 200 });
+        // Se a instância não pertencer a nenhum usuário ou ele não tiver barbearia, ignora
+        if (!userReceiver || !userReceiver.barbershopId) {
+            return NextResponse.json({ status: 'user_not_found' }, { status: 200 });
         }
 
-        const barbershopId = settings.barbershopId;
+        const barbershopId = userReceiver.barbershopId;
+
+        // 2.1. VERIFICA SE A BARBEARIA DESTE USUÁRIO ATIVOU O ROBÔ
+        const settings = await prisma.barbershopSettings.findUnique({
+            where: { barbershopId: barbershopId }
+        });
+
+        // Se as configurações não existirem ou o bot estiver desligado, o WhatsApp fica normal (sem robô)
+        if (!settings || !settings.botEnabled) {
+            return NextResponse.json({ status: 'bot_disabled' }, { status: 200 });
+        }
+
         const phone = remoteJid.split('@')[0]; 
 
         // 3. CAPTURA A MENSAGEM DO CLIENTE (Pode ser texto digitado ou botão clicado)
@@ -152,7 +163,6 @@ export async function POST(request: Request) {
         // ==========================================
 
         // 5A. DETECÇÃO DE PALAVRAS GATILHO (Menu Livre)
-        // Se a sessão está livre, tentamos encontrar uma palavra-chave cadastrada pelo dono
         const allSteps = await prisma.botFlowStep.findMany({
             where: { barbershopId, keyword: { not: null } }
         });
@@ -189,6 +199,13 @@ export async function POST(request: Request) {
                     await dispararMenu(instanceName, remoteJid, selectedOption.nextStepId);
                 }
                 else if (selectedOption.actionType === 'ACAO_SISTEMA' && selectedOption.systemAction === 'START_SCHEDULING') {
+                    
+                    // Trava de Segurança: Verifica se o dono habilitou o Agendamento via Bot nas configurações
+                    if (!settings.enableAutoScheduling) {
+                        await sendTextMessage(instanceName, remoteJid, "O agendamento automático está temporariamente desativado. Por favor, aguarde um momento que já te atendo! ⏳");
+                        return NextResponse.json({ status: 'scheduling_disabled' }, { status: 200 });
+                    }
+
                     // ATIVOU A INTELIGÊNCIA DE AGENDAMENTO! Vamos listar os serviços!
                     await prisma.botSession.update({ where: { id: session.id }, data: { step: 'SCHEDULING_SERVICE', stateData: '{}' } });
                     

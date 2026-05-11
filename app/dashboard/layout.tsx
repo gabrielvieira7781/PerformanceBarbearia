@@ -66,7 +66,6 @@ export default function DashboardLayout({
     { name: 'Início', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Lançar Serviço', href: '/dashboard/servicos', icon: Scissors },
     { name: 'Clientes', href: '/dashboard/clientes', icon: Users },
-    { name: 'Mensagens', href: '/dashboard/mensagens', icon: MessageSquare },
     { name: 'Agenda', href: '/dashboard/agenda', icon: CalendarIcon },
     { name: 'Financeiro', href: '/dashboard/meu-financeiro', icon: Wallet },
   ];

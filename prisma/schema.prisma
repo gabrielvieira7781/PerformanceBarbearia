@@ -20,6 +20,9 @@ model Barbershop {
   phone     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  maxUsers          Int      @default(3)      // Limite grátis de barbeiros
+  saasPlanStatus    String   @default("TRIAL") // TRIAL, ACTIVE, PAST_DUE
+  billingCustomerId String?  // ID do cliente no gateway de pagamentos (Ex: Asaas)
 
   users             User[]
   clients           Client[]
@@ -46,6 +49,10 @@ model User {
   verificationCodeExpires DateTime?
   createdAt               DateTime     @default(now())
   updatedAt               DateTime     @updatedAt
+  whatsappInstanceName    String?      @unique 
+  whatsappToken           String?      
+  isWhatsappConnected     Boolean      @default(false)
+  phone                   String?      // O número de WhatsApp do barbeiro
 
   barbershop              Barbershop?  @relation(fields: [barbershopId], references: [id])
   services                ServiceLog[]
@@ -178,6 +185,12 @@ model BarbershopSettings {
   enablePointsLoyalty Boolean @default(false)
   pointsMultiplier    Float   @default(1.0)  // Ganha quantos pontos a cada R$ 1? (Ex: 1)
   pointsDiscountValue Float   @default(0.05) // Quanto vale cada ponto? (Ex: 0.05 = 5 centavos)
+  enableBirthdayPromo     Boolean  @default(false) // Manda parabéns e promo de aniversário
+  enableReactivationPromo Boolean  @default(false) // Manda msg pra clientes sumidos (o CRON que fizemos)
+  enableReviewRequest     Boolean  @default(false) // Manda msg pedindo avaliação 2h após o corte
+  enableAutoScheduling    Boolean  @default(false) // Permite agendar pelo robô
+  enableAutoReminders     Boolean  @default(false) // Lembrete 2h antes do corte
+  enableCashbackAlerts    Boolean  @default(false) // Aviso de pontos ganhos
 
   // Fidelidade: Cartão de Selos
   enableStampsLoyalty     Boolean @default(false)

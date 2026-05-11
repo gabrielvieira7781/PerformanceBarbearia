@@ -48,12 +48,11 @@ export async function PUT(request: Request) {
         const body = await request.json();
         
         const updateData: any = {};
+        
+        // Módulo Básico
         if (body.allowBarberExpenses !== undefined) updateData.allowBarberExpenses = body.allowBarberExpenses;
-        if (body.whatsappInstanceName !== undefined) updateData.whatsappInstanceName = body.whatsappInstanceName;
-        if (body.whatsappApiKey !== undefined) updateData.whatsappApiKey = body.whatsappApiKey;
-        if (body.isWhatsappConnected !== undefined) updateData.isWhatsappConnected = body.isWhatsappConnected;
-
-        // Novos campos de Fidelidade
+        
+        // Módulos de Fidelidade
         if (body.enablePointsLoyalty !== undefined) updateData.enablePointsLoyalty = body.enablePointsLoyalty;
         if (body.pointsMultiplier !== undefined) updateData.pointsMultiplier = Number(body.pointsMultiplier);
         if (body.pointsDiscountValue !== undefined) updateData.pointsDiscountValue = Number(body.pointsDiscountValue);
@@ -61,6 +60,15 @@ export async function PUT(request: Request) {
         if (body.enableStampsLoyalty !== undefined) updateData.enableStampsLoyalty = body.enableStampsLoyalty;
         if (body.stampsRequiredForReward !== undefined) updateData.stampsRequiredForReward = Number(body.stampsRequiredForReward);
         if (body.stampRewardDescription !== undefined) updateData.stampRewardDescription = body.stampRewardDescription;
+
+        // === MÓDULOS NOVOS DE MARKETING E OPERAÇÃO ===
+        if (body.enableBirthdayPromo !== undefined) updateData.enableBirthdayPromo = body.enableBirthdayPromo;
+        if (body.enableReactivationPromo !== undefined) updateData.enableReactivationPromo = body.enableReactivationPromo;
+        if (body.enableReviewRequest !== undefined) updateData.enableReviewRequest = body.enableReviewRequest;
+        
+        if (body.enableAutoScheduling !== undefined) updateData.enableAutoScheduling = body.enableAutoScheduling;
+        if (body.enableAutoReminders !== undefined) updateData.enableAutoReminders = body.enableAutoReminders;
+        if (body.enableCashbackAlerts !== undefined) updateData.enableCashbackAlerts = body.enableCashbackAlerts;
 
         const updatedSettings = await prisma.barbershopSettings.upsert({
             where: { barbershopId: user.barbershopId },
