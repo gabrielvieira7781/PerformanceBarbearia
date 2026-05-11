@@ -88,6 +88,7 @@ model Client {
   name              String
   phone             String
   isActive          Boolean  @default(true)
+  birthDate         DateTime?  // NOVO: Campo opcional para a data de nascimento
   
   parentId          String?
   parent            Client?  @relation("FamilyLink", fields: [parentId], references: [id])

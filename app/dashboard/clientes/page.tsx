@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Plus, Phone, CheckCircle2, AlertCircle, Link as LinkIcon, UserPlus, Edit2, Ban, Trash2, ShieldCheck, Crown, Star, Award } from 'lucide-react';
+import { Users, Search, Plus, Phone, CheckCircle2, AlertCircle, Link as LinkIcon, UserPlus, Edit2, Ban, Trash2, ShieldCheck, Crown, Star, Award, Calendar } from 'lucide-react';
 
 interface Client {
   id: string;
   name: string;
   phone: string;
+  birthDate?: string | null; // Adicionado para receber a data do banco
   isActive: boolean;
   parentId: string | null;
   parent: { id: string; name: string } | null;
@@ -33,6 +34,7 @@ export default function ClientesPage() {
   
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [birthDate, setBirthDate] = useState(''); // NOVO: Estado da Data de Nascimento
   const [parentId, setParentId] = useState('');
   const [planId, setPlanId] = useState(''); 
 
@@ -97,6 +99,7 @@ export default function ClientesPage() {
     setEditingClient(null);
     setName('');
     setPhone('');
+    setBirthDate(''); // Limpa a data no novo cadastro
     setParentId('');
     setPlanId('');
     setIsModalOpen(true);
@@ -111,6 +114,10 @@ export default function ClientesPage() {
       formattedPhone = formattedPhone.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
     }
     setPhone(formattedPhone || '');
+    
+    // NOVO: Puxa a data do banco e formata para o input tipo "date" (YYYY-MM-DD)
+    setBirthDate(client.birthDate ? client.birthDate.split('T')[0] : '');
+    
     setParentId(client.parentId || '');
     setPlanId(client.planId || '');
     setIsModalOpen(true);
@@ -128,7 +135,8 @@ export default function ClientesPage() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone, parentId, planId: planId || null })
+        // NOVO: Enviando o birthDate no body
+        body: JSON.stringify({ name, phone, birthDate: birthDate || null, parentId, planId: planId || null })
       });
 
       const data = await res.json();
@@ -302,7 +310,7 @@ export default function ClientesPage() {
                 <thead className="bg-zinc-800/50">
                   <tr className="text-zinc-400 text-sm font-bold uppercase tracking-wider">
                     <th className="py-4 px-6">Nome do Cliente</th>
-                    <th className="py-4 px-6">Contato</th>
+                    <th className="py-4 px-6">Contato / Nasc.</th>
                     <th className="py-4 px-6">Fidelidade</th>
                     <th className="py-4 px-6">Clube VIP</th>
                     <th className="py-4 px-6">Vínculos</th>
@@ -320,16 +328,23 @@ export default function ClientesPage() {
                         </div>
                       </td>
                       <td className="py-4 px-6 text-zinc-300 font-mono">
-                        {client.phone ? (
-                           <div className="flex items-center gap-2">
-                             <Phone size={14} className="text-zinc-500" />
-                             {client.phone.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")}
-                           </div>
-                        ) : (
-                          <span className="text-zinc-600 italic">Sem número próprio</span>
-                        )}
+                        <div className="flex flex-col gap-1">
+                          {client.phone ? (
+                             <div className="flex items-center gap-2">
+                               <Phone size={14} className="text-zinc-500" />
+                               <span className="text-sm">{client.phone.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")}</span>
+                             </div>
+                          ) : (
+                            <span className="text-zinc-600 text-xs italic">Sem número próprio</span>
+                          )}
+                          {client.birthDate && (
+                            <div className="flex items-center gap-2 text-xs text-zinc-500">
+                              <Calendar size={12} />
+                              {new Date(client.birthDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                            </div>
+                          )}
+                        </div>
                       </td>
-                      {/* NOVA COLUNA FIDELIDADE */}
                       <td className="py-4 px-6">
                         <div className="flex flex-col gap-1.5">
                           <span className="text-[11px] text-blue-400 font-bold flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded w-max border border-blue-500/20">
@@ -415,6 +430,19 @@ export default function ClientesPage() {
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-black border border-zinc-800 text-white rounded px-4 py-2 focus:outline-none focus:border-[#FFD700]"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-1">Data de Nascimento (Opcional)</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-2.5 text-zinc-500" size={16} />
+                  <input
+                    type="date"
+                    value={birthDate}
+                    onChange={(e) => setBirthDate(e.target.value)}
+                    className="w-full bg-black border border-zinc-800 text-zinc-300 rounded pl-9 pr-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors [color-scheme:dark]"
+                  />
+                </div>
               </div>
 
               <div>

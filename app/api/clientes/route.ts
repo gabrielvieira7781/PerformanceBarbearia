@@ -51,7 +51,8 @@ export async function POST(request: Request) {
         if (!barbershopId) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
 
         const body = await request.json();
-        const { name, phone, parentId, planId } = body;
+        // NOVO: Extraindo o birthDate
+        const { name, phone, parentId, planId, birthDate } = body;
 
         if (!name || (!phone && !parentId)) {
             return NextResponse.json({ message: 'Nome e telefone são obrigatórios.' }, { status: 400 });
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
             data: {
                 name: name.trim(),
                 phone: cleanPhone,
+                birthDate: birthDate ? new Date(birthDate) : null, // NOVO: Salva a data no banco
                 barbershopId,
                 parentId: parentId || null,
                 planId: planId || null 

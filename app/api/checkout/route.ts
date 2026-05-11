@@ -26,7 +26,8 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { clientName, clientPhone, cart, paymentMethod, discount, totalToPay, usedPoints, usedStampsReward } = body;
+        // CORREÇÃO AQUI: Adicionado o clientBirthDate na extração do body!
+        const { clientName, clientPhone, clientBirthDate, cart, paymentMethod, discount, totalToPay, usedPoints, usedStampsReward } = body;
 
         if (!clientName || !cart || cart.length === 0 || !paymentMethod) {
             return NextResponse.json({ message: 'Dados incompletos para o checkout.' }, { status: 400 });
@@ -48,7 +49,19 @@ export async function POST(request: Request) {
 
         if (!client) {
             client = await prisma.client.create({
-                data: { name: clientName, phone: cleanPhone, barbershopId: user.barbershopId }
+                data: { 
+                    name: clientName, 
+                    phone: cleanPhone, 
+                    // Salva a data transformando a string (YYYY-MM-DD) do calendário para Data oficial do Prisma
+                    birthDate: clientBirthDate ? new Date(clientBirthDate) : null,
+                    barbershopId: user.barbershopId 
+                }
+            });
+        } else if (clientBirthDate) {
+            // Se o cliente já existia, mas o dono digitou a data agora (ou atualizou), a gente salva no banco!
+            await prisma.client.update({
+                where: { id: client.id },
+                data: { birthDate: new Date(clientBirthDate) }
             });
         }
 

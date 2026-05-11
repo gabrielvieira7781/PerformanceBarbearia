@@ -1,4 +1,3 @@
-// app/api/clientes/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import jwt from 'jsonwebtoken';
@@ -29,7 +28,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         if (!canEdit) return NextResponse.json({ message: 'Você não tem permissão para editar clientes.' }, { status: 403 });
 
         const body = await request.json();
-        const { name, phone, parentId, isActive, planId } = body;
+        // NOVO: Extraindo o birthDate
+        const { name, phone, parentId, isActive, planId, birthDate } = body;
 
         let cleanPhone = phone ? phone.replace(/\D/g, '') : '';
 
@@ -43,6 +43,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const updateData: any = {};
         if (name) updateData.name = name;
         if (phone !== undefined) updateData.phone = cleanPhone;
+        // NOVO: Atualiza a data se ela for enviada
+        if (birthDate !== undefined) updateData.birthDate = birthDate ? new Date(birthDate) : null;
         if (parentId !== undefined) updateData.parentId = parentId || null;
         if (isActive !== undefined) updateData.isActive = isActive;
         if (planId !== undefined) updateData.planId = planId || null;

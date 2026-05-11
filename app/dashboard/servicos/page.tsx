@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Scissors, User, Phone, Wallet, Plus, Trash2, CheckCircle2, AlertCircle, ShoppingCart, Star, Award, Gift, Package } from 'lucide-react';
+import { Scissors, User, Phone, Wallet, Plus, Trash2, CheckCircle2, AlertCircle, ShoppingCart, Star, Award, Gift, Package, Calendar } from 'lucide-react';
 
 interface ItemType {
   id: string;
@@ -21,6 +21,7 @@ interface ClientType {
   id: string;
   name: string;
   phone: string;
+  birthDate?: string | null; // NOVO: Mapeando a data do banco
   plan?: { 
     id: string; 
     name: string; 
@@ -58,6 +59,7 @@ export default function LancamentoPage() {
   const [selectedClient, setSelectedClient] = useState<ClientType | null>(null);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+  const [clientBirthDate, setClientBirthDate] = useState(''); // NOVO: Estado da data
   const [paymentMethod, setPaymentMethod] = useState('');
   const [discount, setDiscount] = useState('');
 
@@ -110,9 +112,12 @@ export default function LancamentoPage() {
       if (match) {
         setSelectedClient(match);
         if (match.phone && !clientPhone) setClientPhone(match.phone);
+        if (match.birthDate && !clientBirthDate) {
+          setClientBirthDate(match.birthDate.split('T')[0]); // Formata a data do banco (ISO) para o input
+        }
       }
     }
-  }, [clientName, clientsDb, selectedClient, clientPhone]);
+  }, [clientName, clientsDb, selectedClient, clientPhone, clientBirthDate]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, ''); 
@@ -126,6 +131,7 @@ export default function LancamentoPage() {
   const handleSelectExistingClient = (client: ClientType) => {
     setClientName(client.name);
     setClientPhone(client.phone || '');
+    setClientBirthDate(client.birthDate ? client.birthDate.split('T')[0] : ''); // Carrega a data se existir
     setSelectedClient(client); 
     setShowClientList(false);
     setUsePoints(false);
@@ -212,9 +218,10 @@ export default function LancamentoPage() {
         body: JSON.stringify({
           clientName,
           clientPhone: cleanPhone,
+          clientBirthDate, // NOVO: Disparando a data pro Backend
           cart,
           paymentMethod,
-          discount: totalFinancialDiscountToSendBackend, // Envia o somatório de todos os descontos aplicados
+          discount: totalFinancialDiscountToSendBackend,
           totalToPay: total,
           usedPoints: actualPointsUsed,
           usedStampsReward: useStampReward
@@ -348,6 +355,7 @@ export default function LancamentoPage() {
                       setClientName(e.target.value);
                       if (selectedClient && selectedClient.name.toLowerCase() !== e.target.value.toLowerCase()) {
                         setSelectedClient(null); 
+                        setClientBirthDate(''); // Limpa a data se for outro cliente
                         setUsePoints(false);
                         setUseStampReward(false);
                       }
@@ -388,6 +396,21 @@ export default function LancamentoPage() {
                     placeholder="(00) 00000-0000"
                   />
                 </div>
+              </div>
+
+              {/* NOVO CAMPO: DATA DE NASCIMENTO */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-1">Data de Nascimento (Opcional)</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-2.5 text-zinc-500" size={16} />
+                  <input
+                    type="date"
+                    value={clientBirthDate}
+                    onChange={(e) => setClientBirthDate(e.target.value)}
+                    className="w-full bg-black border border-zinc-800 text-zinc-300 rounded pl-9 pr-4 py-2 focus:outline-none focus:border-[#FFD700] transition-colors [color-scheme:dark]"
+                  />
+                </div>
+                <span className="text-[10px] text-zinc-500 mt-1 block">Para campanhas de aniversário pelo WhatsApp.</span>
               </div>
 
               {selectedClient?.plan && (
