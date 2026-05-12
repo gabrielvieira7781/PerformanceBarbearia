@@ -18,7 +18,6 @@ async function sendTextMessage(instanceName: string, number: string, text: strin
             body: JSON.stringify({ number, text, delay: 1200 }) 
         });
         
-        // NOVO: Pegando a fofoca da Evolution
         const data = await res.json().catch(() => null);
         console.log(`[EVOLUTION RES - TEXTO] Status: ${res.status} | Resposta:`, JSON.stringify(data));
         
@@ -36,7 +35,7 @@ async function sendListMessage(instanceName: string, number: string, title: stri
             title: title || "Menu",
             description: description || "Selecione uma das opções abaixo:",
             buttonText: buttonText || "Ver Opções",
-            footerText: "Atendimento Automático", // Algumas versões da Evolution exigem footer
+            footerText: "Atendimento Automático", 
             sections: [{ title: "Opções Disponíveis", rows }]
         };
 
@@ -46,7 +45,6 @@ async function sendListMessage(instanceName: string, number: string, title: stri
             body: JSON.stringify(payload)
         });
         
-        // NOVO: Pegando a fofoca da Evolution
         const data = await res.json().catch(() => null);
         console.log(`[EVOLUTION RES - LISTA] Status: ${res.status} | Resposta:`, JSON.stringify(data));
         
@@ -67,15 +65,16 @@ async function dispararMenu(instanceName: string, phone: string, stepId: string)
         return;
     }
 
+    // CORREÇÃO MESTRA: Se o dono da barbearia não colocar descrição, o robô preenche com um texto padrão.
     const rows = step.options.map(opt => ({
-        title: opt.label.substring(0, 24), // WhatsApp tem limite de 24 caracteres no título do botão
-        description: (opt.description || '').substring(0, 72),
+        title: opt.label.substring(0, 24), 
+        description: opt.description ? opt.description.substring(0, 72) : "Toque para selecionar", // NUNCA PODE SER VAZIO!
         rowId: `OPTION_${opt.id}` 
     }));
 
     await sendListMessage(
         instanceName,
-        phone, // Enviando o número limpo!
+        phone,
         step.menuTitle,
         step.message,
         "Ver Opções",
@@ -129,7 +128,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ status: 'bot_disabled_by_user' }, { status: 200 });
         }
 
-        // PEGANDO O NÚMERO LIMPO (Sem o @lid ou @s.whatsapp.net)
         const phone = remoteJid.split('@')[0]; 
         let incomingText = '';
         
@@ -228,7 +226,7 @@ export async function POST(request: Request) {
                     } else {
                         const serviceRows = services.map(s => ({
                             title: s.name.substring(0, 24),
-                            description: `R$ ${s.price.toFixed(2)}`,
+                            description: `R$ ${s.price.toFixed(2)}`, // NUNCA ESTÁ VAZIO
                             rowId: `SERVICE_${s.id}`
                         }));
                         await sendListMessage(instanceName, phone, "Agendamento", "Qual serviço você deseja?", "Ver Serviços", serviceRows);
@@ -253,7 +251,12 @@ export async function POST(request: Request) {
                     where: { barbershopId, isActive: true, role: { in: ['BARBER', 'ADMIN'] } }
                 });
 
-                const barberRows = barbers.map(b => ({ title: b.name.substring(0, 24), rowId: `BARBER_${b.id}` }));
+                // PROTEÇÃO: Adicionado descrição nos barbeiros para não dar erro
+                const barberRows = barbers.map(b => ({ 
+                    title: b.name.substring(0, 24), 
+                    description: "Profissional disponível",
+                    rowId: `BARBER_${b.id}` 
+                }));
                 await sendListMessage(instanceName, phone, "Profissional", "Com quem você quer agendar?", "Ver Barbeiros", barberRows);
                 break;
 
@@ -265,9 +268,10 @@ export async function POST(request: Request) {
                 stateData.selectedBarberId = incomingText.replace('BARBER_', '');
                 await prisma.botSession.update({ where: { id: session.id }, data: { step: 'SCHEDULING_DATE', stateData: JSON.stringify(stateData) } });
                 
+                // PROTEÇÃO: Adicionado descrição nas datas para não dar erro
                 const dateRows = [
-                    { title: "Hoje", rowId: "DATE_TODAY" },
-                    { title: "Amanhã", rowId: "DATE_TOMORROW" }
+                    { title: "Hoje", description: "Ver horários de hoje", rowId: "DATE_TODAY" },
+                    { title: "Amanhã", description: "Ver horários de amanhã", rowId: "DATE_TOMORROW" }
                 ];
                 await sendListMessage(instanceName, phone, "Data", "Para quando?", "Ver Datas", dateRows);
                 break;
