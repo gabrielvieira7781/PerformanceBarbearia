@@ -9,13 +9,13 @@ const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'Performance2026Key!'
 // FUNÇÕES DE COMUNICAÇÃO COM O WHATSAPP
 // ==========================================
 
-async function sendTextMessage(instanceName: string, number: string, text: string) {
+async function sendTextMessage(instanceName: string, remoteJid: string, text: string) {
     try {
-        console.log(`[WEBHOOK - AÇÃO] Enviando texto para ${number} via ${instanceName}...`);
+        console.log(`[WEBHOOK - AÇÃO] Enviando texto para ${remoteJid} via ${instanceName}...`);
         const res = await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
-            body: JSON.stringify({ number, text, delay: 1200 }) 
+            body: JSON.stringify({ number: remoteJid, text, delay: 1200 }) 
         });
         
         const data = await res.json().catch(() => null);
@@ -26,12 +26,12 @@ async function sendTextMessage(instanceName: string, number: string, text: strin
     }
 }
 
-async function sendListMessage(instanceName: string, number: string, title: string, description: string, buttonText: string, rows: any[]) {
+async function sendListMessage(instanceName: string, remoteJid: string, title: string, description: string, buttonText: string, rows: any[]) {
     try {
-        console.log(`[WEBHOOK - AÇÃO] Enviando lista para ${number} via ${instanceName}...`);
+        console.log(`[WEBHOOK - AÇÃO] Enviando lista para ${remoteJid} via ${instanceName}...`);
         
         const payload = {
-            number,
+            number: remoteJid,
             title: title || "Menu",
             description: description || "Selecione uma das opções abaixo:",
             buttonText: buttonText || "Ver Opções",
@@ -53,7 +53,7 @@ async function sendListMessage(instanceName: string, number: string, title: stri
     }
 }
 
-async function dispararMenu(instanceName: string, phone: string, stepId: string) {
+async function dispararMenu(instanceName: string, remoteJid: string, stepId: string) {
     console.log(`[WEBHOOK - MENU] Buscando step ID: ${stepId}`);
     const step = await prisma.botFlowStep.findUnique({
         where: { id: stepId },
@@ -65,16 +65,15 @@ async function dispararMenu(instanceName: string, phone: string, stepId: string)
         return;
     }
 
-    // CORREÇÃO MESTRA: Se o dono da barbearia não colocar descrição, o robô preenche com um texto padrão.
     const rows = step.options.map(opt => ({
         title: opt.label.substring(0, 24), 
-        description: opt.description ? opt.description.substring(0, 72) : "Toque para selecionar", // NUNCA PODE SER VAZIO!
+        description: opt.description ? opt.description.substring(0, 72) : "Toque para selecionar",
         rowId: `OPTION_${opt.id}` 
     }));
 
     await sendListMessage(
         instanceName,
-        phone,
+        remoteJid,
         step.menuTitle,
         step.message,
         "Ver Opções",
@@ -128,6 +127,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ status: 'bot_disabled_by_user' }, { status: 200 });
         }
 
+        // O phone limpo fica APENAS para o banco de dados
         const phone = remoteJid.split('@')[0]; 
         let incomingText = '';
         
@@ -150,7 +150,8 @@ export async function POST(request: Request) {
             if (session) {
                 await prisma.botSession.update({ where: { id: session.id }, data: { step: 'IDLE', stateData: '{}' } });
             }
-            await sendTextMessage(instanceName, phone, "Atendimento cancelado. Quando precisar, é só chamar! 👍");
+            // Envia resposta usando o remoteJid oficial
+            await sendTextMessage(instanceName, remoteJid, "Atendimento cancelado. Quando precisar, é só chamar! 👍");
             return NextResponse.json({ status: 'reset' }, { status: 200 });
         }
 
@@ -191,7 +192,8 @@ export async function POST(request: Request) {
         if (matchedStep) {
             console.log(`[WEBHOOK - GATILHO] Ativado: ${textUpper}`);
             await prisma.botSession.update({ where: { id: session.id }, data: { step: 'MENU_FLOW', stateData: '{}' } });
-            await dispararMenu(instanceName, phone, matchedStep.id);
+            // Usa o remoteJid aqui!
+            await dispararMenu(instanceName, remoteJid, matchedStep.id);
             return NextResponse.json({ status: 'menu_triggered' }, { status: 200 });
         }
 
@@ -202,15 +204,15 @@ export async function POST(request: Request) {
 
             if (selectedOption) {
                 if (selectedOption.actionType === 'MENSAGEM' && selectedOption.finalMessage) {
-                    await sendTextMessage(instanceName, phone, selectedOption.finalMessage);
+                    await sendTextMessage(instanceName, remoteJid, selectedOption.finalMessage);
                     await prisma.botSession.update({ where: { id: session.id }, data: { step: 'IDLE' } });
                 } 
                 else if (selectedOption.actionType === 'PROXIMA_ETAPA' && selectedOption.nextStepId) {
-                    await dispararMenu(instanceName, phone, selectedOption.nextStepId);
+                    await dispararMenu(instanceName, remoteJid, selectedOption.nextStepId);
                 }
                 else if (selectedOption.actionType === 'ACAO_SISTEMA' && selectedOption.systemAction === 'START_SCHEDULING') {
                     if (!settings?.enableAutoScheduling) {
-                        await sendTextMessage(instanceName, phone, "O agendamento automático está desligado. Em instantes te atenderemos manualmente! ⏳");
+                        await sendTextMessage(instanceName, remoteJid, "O agendamento automático está desligado. Em instantes te atenderemos manualmente! ⏳");
                         return NextResponse.json({ status: 'scheduling_off' }, { status: 200 });
                     }
 
@@ -222,14 +224,14 @@ export async function POST(request: Request) {
                     });
 
                     if (services.length === 0) {
-                        await sendTextMessage(instanceName, phone, "Não temos serviços disponíveis no momento. 😕");
+                        await sendTextMessage(instanceName, remoteJid, "Não temos serviços disponíveis no momento. 😕");
                     } else {
                         const serviceRows = services.map(s => ({
                             title: s.name.substring(0, 24),
-                            description: `R$ ${s.price.toFixed(2)}`, // NUNCA ESTÁ VAZIO
+                            description: `R$ ${s.price.toFixed(2)}`,
                             rowId: `SERVICE_${s.id}`
                         }));
-                        await sendListMessage(instanceName, phone, "Agendamento", "Qual serviço você deseja?", "Ver Serviços", serviceRows);
+                        await sendListMessage(instanceName, remoteJid, "Agendamento", "Qual serviço você deseja?", "Ver Serviços", serviceRows);
                     }
                 }
             }
@@ -240,7 +242,7 @@ export async function POST(request: Request) {
         switch (session.step) {
             case 'SCHEDULING_SERVICE':
                 if (!incomingText.startsWith('SERVICE_')) {
-                    await sendTextMessage(instanceName, phone, "Por favor, selecione um serviço da lista acima.");
+                    await sendTextMessage(instanceName, remoteJid, "Por favor, selecione um serviço da lista acima.");
                     break;
                 }
                 const serviceId = incomingText.replace('SERVICE_', '');
@@ -251,39 +253,37 @@ export async function POST(request: Request) {
                     where: { barbershopId, isActive: true, role: { in: ['BARBER', 'ADMIN'] } }
                 });
 
-                // PROTEÇÃO: Adicionado descrição nos barbeiros para não dar erro
                 const barberRows = barbers.map(b => ({ 
                     title: b.name.substring(0, 24), 
                     description: "Profissional disponível",
                     rowId: `BARBER_${b.id}` 
                 }));
-                await sendListMessage(instanceName, phone, "Profissional", "Com quem você quer agendar?", "Ver Barbeiros", barberRows);
+                await sendListMessage(instanceName, remoteJid, "Profissional", "Com quem você quer agendar?", "Ver Barbeiros", barberRows);
                 break;
 
             case 'SCHEDULING_BARBER':
                 if (!incomingText.startsWith('BARBER_')) {
-                    await sendTextMessage(instanceName, phone, "Por favor, escolha um profissional da lista.");
+                    await sendTextMessage(instanceName, remoteJid, "Por favor, escolha um profissional da lista.");
                     break;
                 }
                 stateData.selectedBarberId = incomingText.replace('BARBER_', '');
                 await prisma.botSession.update({ where: { id: session.id }, data: { step: 'SCHEDULING_DATE', stateData: JSON.stringify(stateData) } });
                 
-                // PROTEÇÃO: Adicionado descrição nas datas para não dar erro
                 const dateRows = [
                     { title: "Hoje", description: "Ver horários de hoje", rowId: "DATE_TODAY" },
                     { title: "Amanhã", description: "Ver horários de amanhã", rowId: "DATE_TOMORROW" }
                 ];
-                await sendListMessage(instanceName, phone, "Data", "Para quando?", "Ver Datas", dateRows);
+                await sendListMessage(instanceName, remoteJid, "Data", "Para quando?", "Ver Datas", dateRows);
                 break;
 
             case 'SCHEDULING_DATE':
-                await sendTextMessage(instanceName, phone, "Show! Central de horários sendo ativada. Digite MENU para recomeçar. 🚀");
+                await sendTextMessage(instanceName, remoteJid, "Show! Central de horários sendo ativada. Digite MENU para recomeçar. 🚀");
                 await prisma.botSession.update({ where: { id: session.id }, data: { step: 'IDLE' } });
                 break;
 
             default:
                 if (textUpper.includes('AGENDAR') || textUpper.includes('CORTE')) {
-                    await sendTextMessage(instanceName, phone, "Olá! Para agendar, digite *MENU*.");
+                    await sendTextMessage(instanceName, remoteJid, "Olá! Para agendar, digite *MENU*.");
                 }
                 break;
         }
