@@ -11,82 +11,130 @@ const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'Performance2026Key!'
 
 async function sendTextMessage(instanceName: string, number: string, text: string, quotedId?: string) {
     try {
-        console.log(`[WEBHOOK - AÇÃO] Enviando texto para ${number}...`);
-        const payload: any = { number, text, delay: 1200 };
+        console.log(`[WEBHOOK - AÇÃO] Enviando texto para ${number} via ${instanceName}...`);
+        
+        const payload: any = { 
+            number: number, 
+            text: text, 
+            options: {
+                delay: 1200,
+                presence: "composing",
+                checkNumber: false // Comando para tentar forçar o envio sem checar o número
+            }
+        };
         
         if (quotedId) {
-            payload.quoted = { key: { id: quotedId } };
+            payload.quoted = { 
+                key: { 
+                    id: quotedId 
+                } 
+            };
         }
 
-        await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
+        const res = await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
+            headers: { 
+                'Content-Type': 'application/json', 
+                'apikey': EVOLUTION_API_KEY 
+            },
             body: JSON.stringify(payload)
         });
+        
+        const data = await res.json().catch(() => null);
+        console.log(`[EVOLUTION RES - TEXTO] Status: ${res.status}`);
+        
     } catch (e) {
         console.error("[WEBHOOK - ERRO] Falha ao enviar mensagem de texto", e);
     }
 }
 
-// 🚀 O NOVO PADRÃO OURO: ENQUETES CLICÁVEIS NATIVAS 🚀
-async function sendPollMenu(instanceName: string, remoteJid: string, title: string, description: string, rows: any[], session: any, quotedId?: string) {
+async function sendListMessage(instanceName: string, number: string, title: string, description: string, buttonText: string, rows: any[], quotedId?: string) {
     try {
-        console.log(`[WEBHOOK - AÇÃO] Enviando Menu Premium (Enquete) para ${remoteJid}...`);
+        console.log(`[WEBHOOK - AÇÃO] Enviando LISTA DE BOTÕES nativos para ${number}...`);
         
-        const pollName = `*${title}*\n${description}`;
-        
-        // O WhatsApp aceita no máximo 12 opções em uma enquete
-        const optionsToLimit = rows.slice(0, 12);
-        const options: string[] = [];
-        const optionsMap: Record<string, string> = {};
-
-        optionsToLimit.forEach((row) => {
-            const optName = row.title; 
-            options.push(optName);
-            // Salva a qual ID interno essa opção clicada pertence
-            optionsMap[optName.toUpperCase()] = row.rowId; 
-        });
-
-        // Salva o mapa de botões na memória do banco de dados
-        let stateData = JSON.parse(session.stateData || '{}');
-        stateData.expectedPollOptions = optionsMap;
-        await prisma.botSession.update({ where: { id: session.id }, data: { stateData: JSON.stringify(stateData) } });
-
         const payload: any = {
-            number: remoteJid,
-            name: pollName,
-            options: options,
-            selectableCount: 1 // Força o cliente a escolher só uma bolinha
+            number: number,
+            title: title || "Menu",
+            description: description || "Selecione uma das opções abaixo:",
+            buttonText: buttonText || "Ver Opções",
+            footerText: "Atendimento Automático", 
+            sections: [
+                { 
+                    title: "Opções Disponíveis", 
+                    rows: rows 
+                }
+            ],
+            options: {
+                delay: 1200,
+                presence: "composing",
+                checkNumber: false // O PULO DO GATO: Desliga a verificação da Evolution que bloqueava o @lid!
+            }
         };
 
-        if (quotedId) payload.quoted = { key: { id: quotedId } };
+        if (quotedId) {
+            payload.quoted = { 
+                key: { 
+                    id: quotedId 
+                } 
+            };
+        }
 
-        const res = await fetch(`${EVOLUTION_API_URL}/message/sendPoll/${instanceName}`, {
+        const res = await fetch(`${EVOLUTION_API_URL}/message/sendList/${instanceName}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
+            headers: { 
+                'Content-Type': 'application/json', 
+                'apikey': EVOLUTION_API_KEY 
+            },
             body: JSON.stringify(payload)
         });
         
-        console.log(`[EVOLUTION RES - POLL] Status: ${res.status}`);
+        const data = await res.json().catch(() => null);
+        console.log(`[EVOLUTION RES - LISTA] Status: ${res.status} | Resposta:`, JSON.stringify(data));
+        
     } catch (e) {
-        console.error("[WEBHOOK - ERRO] Falha ao enviar Enquete", e);
+        console.error("[WEBHOOK - ERRO] Falha ao enviar lista interativa", e);
     }
 }
 
 async function dispararMenu(instanceName: string, remoteJid: string, stepId: string, session: any, quotedId?: string) {
+    console.log(`[WEBHOOK - MENU] Buscando step ID: ${stepId}`);
+    
     const step = await prisma.botFlowStep.findUnique({
-        where: { id: stepId },
-        include: { options: true }
+        where: { 
+            id: stepId 
+        },
+        include: { 
+            options: true 
+        }
     });
 
-    if (!step || step.options.length === 0) return;
+    if (!step) {
+        console.log(`[WEBHOOK - AVISO] Step não encontrado.`);
+        return;
+    }
 
-    const rows = step.options.map(opt => ({
-        title: opt.label.substring(0, 24), 
-        rowId: `OPTION_${opt.id}` 
-    }));
+    if (step.options.length === 0) {
+        console.log(`[WEBHOOK - AVISO] Step sem opções.`);
+        return;
+    }
 
-    await sendPollMenu(instanceName, remoteJid, step.menuTitle, step.message, rows, session, quotedId);
+    const rows = step.options.map(opt => {
+        return {
+            title: opt.label.substring(0, 24), 
+            description: opt.description ? opt.description.substring(0, 72) : "Toque para selecionar",
+            rowId: `OPTION_${opt.id}` 
+        };
+    });
+
+    await sendListMessage(
+        instanceName,
+        remoteJid,
+        step.menuTitle,
+        step.message,
+        "Ver Opções",
+        rows,
+        quotedId
+    );
 }
 
 // ==========================================
@@ -97,120 +145,194 @@ export async function POST(request: Request) {
     try {
         const payload = await request.json();
         
-        // O Webhook agora escuta MENSAGENS e VOTOS EM ENQUETES (Update)
-        if (payload.event !== 'messages.upsert' && payload.event !== 'messages.update') {
+        console.log('\n--- NOVA REQUISIÇÃO RECEBIDA ---');
+        console.log(`[WEBHOOK - EVENTO] ${payload.event}`);
+
+        if (payload.event !== 'messages.upsert') {
             return NextResponse.json({ status: 'ignored' }, { status: 200 });
         }
 
-        let instanceName = payload.instance || payload.instanceName || payload.data?.instance;
-        let remoteJid = '';
-        let isFromMe = false;
-        let messageId = '';
-        let incomingText = '';
-        let messageData: any = null;
+        const instanceName = payload.instance || payload.instanceName || payload.data?.instance;
+        const messageData = payload.data?.message;
+        const remoteJid = payload.data?.key?.remoteJid; 
+        const isFromMe = payload.data?.key?.fromMe; 
+        const messageId = payload.data?.key?.id;
 
-        // 🎯 CAPTURA DE CLIQUES NA ENQUETE (VOTOS)
-        if (payload.event === 'messages.update') {
-            const updateObj = Array.isArray(payload.data) ? payload.data[0] : payload.data;
-            remoteJid = updateObj?.key?.remoteJid;
-            isFromMe = updateObj?.key?.fromMe;
-            messageId = updateObj?.key?.id;
+        console.log(`[WEBHOOK - INFO] Instância: ${instanceName} | Remetente: ${remoteJid}`);
 
-            console.log('\n--- VOTO DE ENQUETE RECEBIDO ---');
-            console.log(`[WEBHOOK - DEBUG POLL]`, JSON.stringify(updateObj, null, 2));
-
-            // Tenta pegar o nome do botão que o cliente clicou
-            const pollUpdate = updateObj?.update?.pollUpdates?.[0];
-            if (pollUpdate && pollUpdate.name) {
-                incomingText = pollUpdate.name; // Achou o nome!
-            } else {
-                // Se a Evolution não descodificou na hora, a gente ignora esse disparo e pega no Upsert
-                return NextResponse.json({ status: 'ignored_update' }, { status: 200 });
-            }
-        } 
-        // 💬 CAPTURA DE TEXTOS E RESPOSTAS NORMAIS
-        else {
-            console.log('\n--- MENSAGEM RECEBIDA ---');
-            messageData = payload.data?.message;
-            remoteJid = payload.data?.key?.remoteJid;
-            isFromMe = payload.data?.key?.fromMe;
-            messageId = payload.data?.key?.id;
-
-            if (isFromMe || !remoteJid || remoteJid.includes('@g.us') || !messageData) {
-                return NextResponse.json({ status: 'ignored' }, { status: 200 });
-            }
-
-            if (messageData.conversation) incomingText = messageData.conversation;
-            else if (messageData.extendedTextMessage?.text) incomingText = messageData.extendedTextMessage.text;
-            else if (messageData.pollUpdateMessage) {
-                const vote = messageData.pollUpdateMessage?.vote?.selectedOptions?.[0];
-                if (vote) incomingText = vote;
-            }
-        }
-
-        if (!incomingText) return NextResponse.json({ status: 'no_text' }, { status: 200 });
-        const textUpper = incomingText.toUpperCase().trim();
-        console.log(`[WEBHOOK - DADO] Cliente disse/clicou: "${textUpper}"`);
-
-        const userReceiver = await prisma.user.findFirst({ where: { whatsappInstanceName: instanceName } });
-        if (!userReceiver || !userReceiver.barbershopId || !userReceiver.botEnabled) {
+        if (isFromMe) {
+            console.log('[WEBHOOK - SKIP] Ignorado por ser mensagem própria.');
             return NextResponse.json({ status: 'ignored' }, { status: 200 });
         }
+
+        if (!remoteJid) {
+            console.log('[WEBHOOK - SKIP] Ignorado por não ter remoteJid.');
+            return NextResponse.json({ status: 'ignored' }, { status: 200 });
+        }
+
+        if (remoteJid.includes('@g.us')) {
+            console.log('[WEBHOOK - SKIP] Ignorado por ser grupo.');
+            return NextResponse.json({ status: 'ignored' }, { status: 200 });
+        }
+
+        if (!messageData) {
+            console.log('[WEBHOOK - SKIP] Ignorado por não ter dados na mensagem.');
+            return NextResponse.json({ status: 'ignored' }, { status: 200 });
+        }
+
+        const userReceiver = await prisma.user.findFirst({
+            where: { 
+                whatsappInstanceName: instanceName 
+            }
+        });
+
+        if (!userReceiver) {
+            console.log(`[WEBHOOK - ERRO] Instância "${instanceName}" não está vinculada a nenhum usuário no banco.`);
+            return NextResponse.json({ status: 'user_not_linked' }, { status: 200 });
+        }
+
+        if (!userReceiver.barbershopId) {
+            console.log(`[WEBHOOK - ERRO] Usuário sem barbearia vinculada.`);
+            return NextResponse.json({ status: 'user_not_linked' }, { status: 200 });
+        }
+
         const barbershopId = userReceiver.barbershopId;
-        const settings = await prisma.barbershopSettings.findUnique({ where: { barbershopId } });
-        const phone = remoteJid.split('@')[0]; 
+        
+        const settings = await prisma.barbershopSettings.findUnique({
+            where: { 
+                barbershopId: barbershopId 
+            }
+        });
 
-        let session = await prisma.botSession.findUnique({ where: { phone } });
+        if (!userReceiver.botEnabled) {
+            console.log(`[WEBHOOK - STOP] Robô desativado individualmente pelo barbeiro ${userReceiver.name}.`);
+            return NextResponse.json({ status: 'bot_disabled_by_user' }, { status: 200 });
+        }
+
+        const phone = remoteJid.split('@')[0]; 
+        let incomingText = '';
+        
+        if (messageData.conversation) {
+            incomingText = messageData.conversation;
+        } else if (messageData.extendedTextMessage?.text) {
+            incomingText = messageData.extendedTextMessage.text;
+        } else if (messageData.listResponseMessage?.singleSelectReply?.selectedRowId) {
+            incomingText = messageData.listResponseMessage.singleSelectReply.selectedRowId; 
+        }
+
+        console.log(`[WEBHOOK - MENSAGEM] Conteúdo: "${incomingText}"`);
+
+        if (!incomingText) {
+            return NextResponse.json({ status: 'no_text' }, { status: 200 });
+        }
+
+        const textUpper = incomingText.toUpperCase().trim();
+        
+        let session = await prisma.botSession.findUnique({ 
+            where: { 
+                phone: phone 
+            } 
+        });
 
         if (textUpper === 'CANCELAR' || textUpper === 'SAIR') {
-            if (session) await prisma.botSession.update({ where: { id: session.id }, data: { step: 'IDLE', stateData: '{}' } });
+            if (session) {
+                await prisma.botSession.update({ 
+                    where: { 
+                        id: session.id 
+                    }, 
+                    data: { 
+                        step: 'IDLE', 
+                        stateData: '{}' 
+                    } 
+                });
+            }
             await sendTextMessage(instanceName, remoteJid, "Atendimento cancelado. Quando precisar, é só chamar! 👍", messageId);
             return NextResponse.json({ status: 'reset' }, { status: 200 });
         }
 
         if (!session) {
-            const existingClient = await prisma.client.findFirst({ where: { phone: { contains: phone.substring(2) }, barbershopId } });
+            const existingClient = await prisma.client.findFirst({
+                where: { 
+                    phone: { 
+                        contains: phone.substring(2) 
+                    }, 
+                    barbershopId: barbershopId 
+                } 
+            });
+
             session = await prisma.botSession.create({
-                data: { phone, barbershopId, clientId: existingClient?.id || null, step: 'IDLE', stateData: '{}' }
+                data: {
+                    phone: phone,
+                    barbershopId: barbershopId,
+                    clientId: existingClient ? existingClient.id : null,
+                    step: 'IDLE',
+                    stateData: '{}'
+                }
             });
         }
 
         let stateData = JSON.parse(session.stateData || '{}');
 
-        // 🧠 O CÉREBRO DA ENQUETE: Transforma o Clique no ID do Sistema
-        if (stateData.expectedPollOptions && stateData.expectedPollOptions[textUpper]) {
-            // O cliente clicou num botão da enquete! Substituímos o texto dele pelo ID interno do botão.
-            incomingText = stateData.expectedPollOptions[textUpper];
-            delete stateData.expectedPollOptions; 
-            await prisma.botSession.update({ where: { id: session.id }, data: { stateData: JSON.stringify(stateData) } });
-            console.log(`[WEBHOOK - TRADUTOR] Clique detectado! Transformado para comando: ${incomingText}`);
-        }
-
         // 5A. DETECÇÃO DE PALAVRAS GATILHO
-        const allSteps = await prisma.botFlowStep.findMany({ where: { barbershopId, keyword: { not: null } } });
+        const allSteps = await prisma.botFlowStep.findMany({
+            where: { 
+                barbershopId: barbershopId, 
+                keyword: { 
+                    not: null 
+                } 
+            }
+        });
+
         let matchedStep = null;
         for (const step of allSteps) {
-            if (step.keyword && step.keyword.split(',').map(w => w.trim().toUpperCase()).includes(textUpper)) {
-                matchedStep = step;
-                break;
+            if (step.keyword) {
+                const words = step.keyword.split(',').map(w => w.trim().toUpperCase());
+                if (words.includes(textUpper)) {
+                    matchedStep = step;
+                    break;
+                }
             }
         }
 
         if (matchedStep) {
-            await prisma.botSession.update({ where: { id: session.id }, data: { step: 'MENU_FLOW', stateData: JSON.stringify(stateData) } });
+            console.log(`[WEBHOOK - GATILHO] Ativado: ${textUpper}`);
+            
+            await prisma.botSession.update({ 
+                where: { 
+                    id: session.id 
+                }, 
+                data: { 
+                    step: 'MENU_FLOW', 
+                    stateData: '{}' 
+                } 
+            });
+            
             await dispararMenu(instanceName, remoteJid, matchedStep.id, session, messageId);
-            return NextResponse.json({ status: 'ok' }, { status: 200 });
+            return NextResponse.json({ status: 'menu_triggered' }, { status: 200 });
         }
 
-        // 5B. PROCESSAMENTO DE BOTÕES DE MENU (OPTION_)
+        // 5B. PROCESSAMENTO DE BOTÕES (OPTION_)
         if (incomingText.startsWith('OPTION_')) {
             const optionId = incomingText.replace('OPTION_', '');
-            const selectedOption = await prisma.botFlowOption.findUnique({ where: { id: optionId } });
+            
+            const selectedOption = await prisma.botFlowOption.findUnique({ 
+                where: { 
+                    id: optionId 
+                } 
+            });
 
             if (selectedOption) {
                 if (selectedOption.actionType === 'MENSAGEM' && selectedOption.finalMessage) {
                     await sendTextMessage(instanceName, remoteJid, selectedOption.finalMessage, messageId);
-                    await prisma.botSession.update({ where: { id: session.id }, data: { step: 'IDLE' } });
+                    
+                    await prisma.botSession.update({ 
+                        where: { 
+                            id: session.id 
+                        }, 
+                        data: { 
+                            step: 'IDLE' 
+                        } 
+                    });
                 } 
                 else if (selectedOption.actionType === 'PROXIMA_ETAPA' && selectedOption.nextStepId) {
                     await dispararMenu(instanceName, remoteJid, selectedOption.nextStepId, session, messageId);
@@ -218,55 +340,134 @@ export async function POST(request: Request) {
                 else if (selectedOption.actionType === 'ACAO_SISTEMA' && selectedOption.systemAction === 'START_SCHEDULING') {
                     if (!settings?.enableAutoScheduling) {
                         await sendTextMessage(instanceName, remoteJid, "O agendamento automático está desligado. Em instantes te atenderemos manualmente! ⏳", messageId);
-                        return NextResponse.json({ status: 'ok' }, { status: 200 });
+                        return NextResponse.json({ status: 'scheduling_off' }, { status: 200 });
                     }
-                    await prisma.botSession.update({ where: { id: session.id }, data: { step: 'SCHEDULING_SERVICE', stateData: '{}' } });
-                    const services = await prisma.serviceType.findMany({ where: { barbershopId, isActive: true }, orderBy: { name: 'asc' } });
+
+                    await prisma.botSession.update({ 
+                        where: { 
+                            id: session.id 
+                        }, 
+                        data: { 
+                            step: 'SCHEDULING_SERVICE', 
+                            stateData: '{}' 
+                        } 
+                    });
+                    
+                    const services = await prisma.serviceType.findMany({
+                        where: { 
+                            barbershopId: barbershopId, 
+                            isActive: true 
+                        },
+                        orderBy: { 
+                            name: 'asc' 
+                        }
+                    });
 
                     if (services.length === 0) {
-                        await sendTextMessage(instanceName, remoteJid, "Não temos serviços disponíveis. 😕", messageId);
+                        await sendTextMessage(instanceName, remoteJid, "Não temos serviços disponíveis no momento. 😕", messageId);
                     } else {
-                        const serviceRows = services.map(s => ({
-                            title: `${s.name} - R$ ${s.price.toFixed(2)}`, rowId: `SERVICE_${s.id}`
-                        }));
-                        await sendPollMenu(instanceName, remoteJid, "Agendamento", "Qual serviço você deseja?", serviceRows, session, messageId);
+                        const serviceRows = services.map(s => {
+                            return {
+                                title: s.name.substring(0, 24),
+                                description: `R$ ${s.price.toFixed(2)}`,
+                                rowId: `SERVICE_${s.id}`
+                            };
+                        });
+                        
+                        await sendListMessage(instanceName, remoteJid, "Agendamento", "Qual serviço você deseja?", "Ver Serviços", serviceRows, messageId);
                     }
                 }
             }
-            return NextResponse.json({ status: 'ok' }, { status: 200 });
+            return NextResponse.json({ status: 'option_processed' }, { status: 200 });
         }
 
-        // 5C. FUNIL DE AGENDAMENTO (CADA PASSO AGORA É UMA ENQUETE)
-        switch (session.step) {
-            case 'SCHEDULING_SERVICE':
-                if (!incomingText.startsWith('SERVICE_')) return NextResponse.json({ status: 'ok' }, { status: 200 });
-                stateData.selectedServiceId = incomingText.replace('SERVICE_', '');
-                await prisma.botSession.update({ where: { id: session.id }, data: { step: 'SCHEDULING_BARBER', stateData: JSON.stringify(stateData) } });
+        // 5C. FUNIL DE AGENDAMENTO
+        if (session.step === 'SCHEDULING_SERVICE') {
+            if (!incomingText.startsWith('SERVICE_')) {
+                await sendTextMessage(instanceName, remoteJid, "Por favor, selecione uma opção válida no menu acima.", messageId);
+            } else {
+                const serviceId = incomingText.replace('SERVICE_', '');
+                stateData.selectedServiceId = serviceId;
                 
-                const barbers = await prisma.user.findMany({ where: { barbershopId, isActive: true, role: { in: ['BARBER', 'ADMIN'] } } });
-                const barberRows = barbers.map(b => ({ title: `✂️ ${b.name}`, rowId: `BARBER_${b.id}` }));
-                await sendPollMenu(instanceName, remoteJid, "Profissional", "Com quem você quer cortar?", barberRows, session, messageId);
-                break;
+                await prisma.botSession.update({ 
+                    where: { 
+                        id: session.id 
+                    }, 
+                    data: { 
+                        step: 'SCHEDULING_BARBER', 
+                        stateData: JSON.stringify(stateData) 
+                    } 
+                });
+                
+                const barbers = await prisma.user.findMany({
+                    where: { 
+                        barbershopId: barbershopId, 
+                        isActive: true, 
+                        role: { 
+                            in: ['BARBER', 'ADMIN'] 
+                        } 
+                    }
+                });
 
-            case 'SCHEDULING_BARBER':
-                if (!incomingText.startsWith('BARBER_')) return NextResponse.json({ status: 'ok' }, { status: 200 });
+                const barberRows = barbers.map(b => {
+                    return { 
+                        title: b.name.substring(0, 24), 
+                        description: "Profissional disponível",
+                        rowId: `BARBER_${b.id}` 
+                    };
+                });
+                
+                await sendListMessage(instanceName, remoteJid, "Profissional", "Com quem você quer agendar?", "Ver Barbeiros", barberRows, messageId);
+            }
+        } 
+        else if (session.step === 'SCHEDULING_BARBER') {
+            if (!incomingText.startsWith('BARBER_')) {
+                await sendTextMessage(instanceName, remoteJid, "Por favor, escolha uma opção válida no menu.", messageId);
+            } else {
                 stateData.selectedBarberId = incomingText.replace('BARBER_', '');
-                await prisma.botSession.update({ where: { id: session.id }, data: { step: 'SCHEDULING_DATE', stateData: JSON.stringify(stateData) } });
                 
-                const dateRows = [ { title: "📅 Hoje", rowId: "DATE_TODAY" }, { title: "🗓️ Amanhã", rowId: "DATE_TOMORROW" } ];
-                await sendPollMenu(instanceName, remoteJid, "Data", "Para quando seria?", dateRows, session, messageId);
-                break;
-
-            case 'SCHEDULING_DATE':
-                await sendTextMessage(instanceName, remoteJid, "Show! Central de horários ativada. Digite MENU para recomeçar. 🚀", messageId);
-                await prisma.botSession.update({ where: { id: session.id }, data: { step: 'IDLE' } });
-                break;
-
-            default:
-                if (textUpper.includes('AGENDAR') || textUpper.includes('CORTE')) {
-                    await sendTextMessage(instanceName, remoteJid, "Olá! Para agendar, digite *MENU*.", messageId);
-                }
-                break;
+                await prisma.botSession.update({ 
+                    where: { 
+                        id: session.id 
+                    }, 
+                    data: { 
+                        step: 'SCHEDULING_DATE', 
+                        stateData: JSON.stringify(stateData) 
+                    } 
+                });
+                
+                const dateRows = [
+                    { 
+                        title: "Hoje", 
+                        description: "Ver horários de hoje", 
+                        rowId: "DATE_TODAY" 
+                    },
+                    { 
+                        title: "Amanhã", 
+                        description: "Ver horários de amanhã", 
+                        rowId: "DATE_TOMORROW" 
+                    }
+                ];
+                
+                await sendListMessage(instanceName, remoteJid, "Data", "Para quando?", "Ver Datas", dateRows, messageId);
+            }
+        } 
+        else if (session.step === 'SCHEDULING_DATE') {
+            await sendTextMessage(instanceName, remoteJid, "Show! Central de horários sendo ativada. Digite MENU para recomeçar. 🚀", messageId);
+            
+            await prisma.botSession.update({ 
+                where: { 
+                    id: session.id 
+                }, 
+                data: { 
+                    step: 'IDLE' 
+                } 
+            });
+        } 
+        else {
+            if (textUpper.includes('AGENDAR') || textUpper.includes('CORTE')) {
+                await sendTextMessage(instanceName, remoteJid, "Olá! Para agendar, digite *MENU*.", messageId);
+            }
         }
 
         return NextResponse.json({ success: true }, { status: 200 });
