@@ -223,7 +223,7 @@ export async function POST(request: Request) {
                 }
                 else if (selectedOption.actionType === 'ACAO_SISTEMA' && selectedOption.systemAction === 'START_SCHEDULING') {
                     console.log(`[WEBHOOK - AÇÃO] Iniciando inteligência de agendamento.`);
-                    if (!settings.enableAutoScheduling) {
+                    if (!settings?.enableAutoScheduling) {
                         console.log(`[WEBHOOK - AVISO] Agendamento bloqueado nas configurações da barbearia.`);
                         await sendTextMessage(instanceName, remoteJid, "O agendamento automático está temporariamente desativado. Por favor, aguarde um momento que já te atendo! ⏳");
                         return NextResponse.json({ status: 'scheduling_disabled' }, { status: 200 });
