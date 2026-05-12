@@ -11,18 +11,20 @@ const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'Performance2026Key!'
 
 async function sendTextMessage(instanceName: string, number: string, text: string) {
     try {
+        console.log(`[WEBHOOK - AÇÃO] Enviando texto para ${number} via ${instanceName}...`);
         await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
             body: JSON.stringify({ number, text, delay: 1200 }) // Delay simula o bot digitando
         });
     } catch (e) {
-        console.error("Erro ao enviar mensagem de texto", e);
+        console.error("[WEBHOOK - ERRO] Falha ao enviar mensagem de texto", e);
     }
 }
 
 async function sendListMessage(instanceName: string, number: string, title: string, description: string, buttonText: string, rows: any[]) {
     try {
+        console.log(`[WEBHOOK - AÇÃO] Enviando lista iterativa para ${number} via ${instanceName}...`);
         await fetch(`${EVOLUTION_API_URL}/message/sendList/${instanceName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
@@ -35,18 +37,22 @@ async function sendListMessage(instanceName: string, number: string, title: stri
             })
         });
     } catch (e) {
-        console.error("Erro ao enviar lista interativa", e);
+        console.error("[WEBHOOK - ERRO] Falha ao enviar lista interativa", e);
     }
 }
 
 // Função auxiliar para enviar um fluxo de menu específico
 async function dispararMenu(instanceName: string, remoteJid: string, stepId: string) {
+    console.log(`[WEBHOOK - MENU] Montando menu ID: ${stepId}`);
     const step = await prisma.botFlowStep.findUnique({
         where: { id: stepId },
         include: { options: true }
     });
 
-    if (!step || step.options.length === 0) return;
+    if (!step || step.options.length === 0) {
+        console.log(`[WEBHOOK - AVISO] Menu não encontrado ou sem opções configuradas.`);
+        return;
+    }
 
     // Converte as opções do banco de dados no formato de Lista do WhatsApp
     const rows = step.options.map(opt => ({
@@ -72,9 +78,14 @@ async function dispararMenu(instanceName: string, remoteJid: string, stepId: str
 export async function POST(request: Request) {
     try {
         const payload = await request.json();
+        
+        // LOG 1: Disparo inicial
+        console.log('\n=============================================');
+        console.log(`[WEBHOOK - START] Recebendo evento: ${payload.event}`);
 
         // 1. FILTRO DE SEGURANÇA: Só aceitamos mensagens novas
         if (payload.event !== 'messages.upsert') {
+            console.log('[WEBHOOK - STOP] Evento ignorado (não é messages.upsert).');
             return NextResponse.json({ status: 'ignored' }, { status: 200 });
         }
 
@@ -83,56 +94,65 @@ export async function POST(request: Request) {
         const remoteJid = payload.data.key.remoteJid; // O número de telefone
         const isFromMe = payload.data.key.fromMe; // Se a barbearia quem mandou do próprio celular
 
+        console.log(`[WEBHOOK - INFO] Instância: ${instanceName} | De: ${remoteJid} | isFromMe: ${isFromMe}`);
+
         // Ignora status, mensagens de grupos e mensagens enviadas pelo próprio dono
         if (isFromMe || remoteJid.includes('@g.us') || !messageData) {
+            console.log('[WEBHOOK - STOP] Ignorado: Mensagem do próprio aparelho, grupo ou sem corpo.');
             return NextResponse.json({ status: 'ignored' }, { status: 200 });
         }
 
         // 2. IDENTIFICA QUEM RECEBEU A MENSAGEM (Novo fluxo de Arquitetura SaaS)
-        // Procura qual usuário (barbeiro ou dono) é o dono dessa instância do WhatsApp
         const userReceiver = await prisma.user.findFirst({
             where: { whatsappInstanceName: instanceName }
         });
 
-        // Se a instância não pertencer a nenhum usuário ou ele não tiver barbearia, ignora
         if (!userReceiver || !userReceiver.barbershopId) {
+            console.log(`[WEBHOOK - STOP] Usuário dono da instância "${instanceName}" não encontrado ou sem barbearia atrelada.`);
             return NextResponse.json({ status: 'user_not_found' }, { status: 200 });
         }
 
         const barbershopId = userReceiver.barbershopId;
+        console.log(`[WEBHOOK - INFO] Barbearia Identificada: ID ${barbershopId} (User: ${userReceiver.name})`);
 
         // 2.1. VERIFICA SE A BARBEARIA DESTE USUÁRIO ATIVOU O ROBÔ
         const settings = await prisma.barbershopSettings.findUnique({
             where: { barbershopId: barbershopId }
         });
 
-        // Se as configurações não existirem ou o bot estiver desligado, o WhatsApp fica normal (sem robô)
         if (!settings || !settings.botEnabled) {
+            console.log(`[WEBHOOK - STOP] Robô desativado nas configurações da barbearia.`);
             return NextResponse.json({ status: 'bot_disabled' }, { status: 200 });
         }
 
         const phone = remoteJid.split('@')[0]; 
 
-        // 3. CAPTURA A MENSAGEM DO CLIENTE (Pode ser texto digitado ou botão clicado)
+        // 3. CAPTURA A MENSAGEM DO CLIENTE
         let incomingText = '';
         if (messageData.conversation) {
             incomingText = messageData.conversation;
         } else if (messageData.extendedTextMessage?.text) {
             incomingText = messageData.extendedTextMessage.text;
         } else if (messageData.listResponseMessage?.singleSelectReply?.selectedRowId) {
-            // Aqui pegamos o ID escondido da lista se ele clicou em um botão!
             incomingText = messageData.listResponseMessage.singleSelectReply.selectedRowId; 
         }
 
-        if (!incomingText) return NextResponse.json({ status: 'no_text' }, { status: 200 });
+        console.log(`[WEBHOOK - TEXTO] Cliente digitou/clicou: "${incomingText}"`);
+
+        if (!incomingText) {
+            console.log('[WEBHOOK - STOP] Nenhuma extração de texto válida (talvez enviou imagem/áudio puro).');
+            return NextResponse.json({ status: 'no_text' }, { status: 200 });
+        }
 
         const textUpper = incomingText.toUpperCase().trim();
 
         // 4. INICIA OU RECUPERA A MEMÓRIA DO ROBÔ (SESSÃO)
         let session = await prisma.botSession.findUnique({ where: { phone } });
+        console.log(`[WEBHOOK - SESSÃO] Sessão encontrada? ${session ? 'Sim (Step: ' + session.step + ')' : 'Não. Criando nova...'}`);
 
-        // Escape: Se ele digitar CANCELAR ou SAIR, limpamos a memória e travamos o fluxo
+        // Escape: Se ele digitar CANCELAR ou SAIR
         if (textUpper === 'CANCELAR' || textUpper === 'SAIR') {
+            console.log(`[WEBHOOK - AÇÃO] Cliente solicitou cancelamento do fluxo.`);
             if (session) {
                 await prisma.botSession.update({ where: { id: session.id }, data: { step: 'IDLE', stateData: '{}' } });
             }
@@ -142,7 +162,7 @@ export async function POST(request: Request) {
 
         if (!session) {
             const existingClient = await prisma.client.findFirst({
-                where: { phone: { contains: phone.substring(2) }, barbershopId } // Procura sem o 55 do país
+                where: { phone: { contains: phone.substring(2) }, barbershopId } 
             });
 
             session = await prisma.botSession.create({
@@ -179,6 +199,7 @@ export async function POST(request: Request) {
         }
 
         if (matchedStep) {
+            console.log(`[WEBHOOK - GATILHO] Palavra-chave acionada: "${textUpper}". Redirecionando para o menu...`);
             await prisma.botSession.update({ where: { id: session.id }, data: { step: 'MENU_FLOW', stateData: '{}' } });
             await dispararMenu(instanceName, remoteJid, matchedStep.id);
             return NextResponse.json({ status: 'menu_triggered' }, { status: 200 });
@@ -186,27 +207,28 @@ export async function POST(request: Request) {
 
         // 5B. PROCESSAMENTO DE NAVEGAÇÃO DE MENU (Ele clicou num botão customizado)
         if (incomingText.startsWith('OPTION_')) {
+            console.log(`[WEBHOOK - BOTÃO] Cliente clicou na opção ID: ${incomingText}`);
             const optionId = incomingText.replace('OPTION_', '');
             const selectedOption = await prisma.botFlowOption.findUnique({ where: { id: optionId } });
 
             if (selectedOption) {
                 if (selectedOption.actionType === 'MENSAGEM' && selectedOption.finalMessage) {
+                    console.log(`[WEBHOOK - AÇÃO] Entregando mensagem final do fluxo.`);
                     await sendTextMessage(instanceName, remoteJid, selectedOption.finalMessage);
-                    // Opcional: Voltar a sessão para IDLE após entregar a resposta final
                     await prisma.botSession.update({ where: { id: session.id }, data: { step: 'IDLE' } });
                 } 
                 else if (selectedOption.actionType === 'PROXIMA_ETAPA' && selectedOption.nextStepId) {
+                    console.log(`[WEBHOOK - AÇÃO] Pulando para a próxima etapa do fluxo.`);
                     await dispararMenu(instanceName, remoteJid, selectedOption.nextStepId);
                 }
                 else if (selectedOption.actionType === 'ACAO_SISTEMA' && selectedOption.systemAction === 'START_SCHEDULING') {
-                    
-                    // Trava de Segurança: Verifica se o dono habilitou o Agendamento via Bot nas configurações
+                    console.log(`[WEBHOOK - AÇÃO] Iniciando inteligência de agendamento.`);
                     if (!settings.enableAutoScheduling) {
+                        console.log(`[WEBHOOK - AVISO] Agendamento bloqueado nas configurações da barbearia.`);
                         await sendTextMessage(instanceName, remoteJid, "O agendamento automático está temporariamente desativado. Por favor, aguarde um momento que já te atendo! ⏳");
                         return NextResponse.json({ status: 'scheduling_disabled' }, { status: 200 });
                     }
 
-                    // ATIVOU A INTELIGÊNCIA DE AGENDAMENTO! Vamos listar os serviços!
                     await prisma.botSession.update({ where: { id: session.id }, data: { step: 'SCHEDULING_SERVICE', stateData: '{}' } });
                     
                     const services = await prisma.serviceType.findMany({
@@ -230,10 +252,12 @@ export async function POST(request: Request) {
         }
 
         // 5C. FUNIL DE AGENDAMENTO INTELIGENTE (As etapas travadas da barbearia)
+        console.log(`[WEBHOOK - FUNIL] Processando passo travado da sessão: ${session.step}`);
         switch (session.step) {
             
             case 'SCHEDULING_SERVICE':
                 if (!incomingText.startsWith('SERVICE_')) {
+                    console.log(`[WEBHOOK - FUNIL] Resposta inválida para seleção de serviço.`);
                     await sendTextMessage(instanceName, remoteJid, "Por favor, clique no botão acima para selecionar um serviço válido da lista.");
                     break;
                 }
@@ -282,19 +306,17 @@ export async function POST(request: Request) {
                     break;
                 }
 
-                // O cálculo avançado de horários (aqui será o motor final de bater com a agenda)
                 await sendTextMessage(instanceName, remoteJid, "Show! Como ainda estamos ativando a central de horários da agenda, este é o fim do seu teste de integração! O cérebro está ligado. Para testar de novo digite MENU. 🚀");
                 await prisma.botSession.update({ where: { id: session.id }, data: { step: 'IDLE' } });
                 break;
 
             case 'IDLE':
             default:
-                // Se ele mandar mensagem aleatória, a gente checa se tem a palavra "Agendar"
                 if (textUpper.includes('AGENDAR') || textUpper.includes('CORTE') || textUpper.includes('CORTAR')) {
+                    console.log(`[WEBHOOK - IDLE] Detectada intenção de agendamento solta.`);
                     await sendTextMessage(instanceName, remoteJid, "Vi que você quer dar um trato no visual! Digite *MENU* para acessar as opções e marcar seu horário.");
                 } else {
-                    // Mensagem muda apenas se o bot for ativado e não estiver em nenhum fluxo
-                    // Opcionalmente, pode simplesmente ignorar se não tiver palavra-chave
+                    console.log(`[WEBHOOK - IDLE] Mensagem genérica ignorada (Sessão livre).`);
                 }
                 break;
         }
@@ -302,7 +324,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true }, { status: 200 });
 
     } catch (error) {
-        console.error('Erro Fatal no Webhook:', error);
+        console.error('[WEBHOOK - ERRO FATAL]', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
