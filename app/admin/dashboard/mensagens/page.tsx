@@ -10,6 +10,7 @@ type Barber = {
   isActive: boolean; 
   whatsappInstanceName: string | null;
   isWhatsappConnected: boolean;
+  botEnabled?: boolean; // NOVO: Propriedade para saber se o robô dele está ligado
 };
 
 export default function MensagensDashboard() {
@@ -156,6 +157,28 @@ export default function MensagensDashboard() {
     }
   };
 
+  // NOVO: Função para Ligar/Desligar o Robô individualmente
+  const handleToggleBot = async (userId: string, currentState: boolean, name: string) => {
+    setIsProcessing(userId);
+    try {
+      const res = await fetch('/api/whatsapp/toggle-bot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, botEnabled: !currentState }),
+      });
+      
+      if (res.ok) {
+        setBarbers(prev => prev.map(b => b.id === userId ? { ...b, botEnabled: !currentState } : b));
+      } else {
+        alert("Erro ao alterar o status do robô.");
+      }
+    } catch (error) {
+      alert("Erro de comunicação com o servidor.");
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="mb-8 border-b pb-6">
@@ -217,7 +240,22 @@ export default function MensagensDashboard() {
                 )}
               </div>
 
-              <div className="mt-auto pt-5 border-t border-gray-100">
+              {/* NOVO: Botão Switch de Ligar/Desligar Robô Individual */}
+              <div className="flex items-center justify-between mt-2 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-gray-700">Robô Automático</span>
+                  <span className="text-[10px] text-gray-500">Ative ou pause o bot deste número</span>
+                </div>
+                <button
+                  onClick={() => handleToggleBot(barber.id, barber.botEnabled ?? true, barber.name)}
+                  disabled={isProcessing === barber.id}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${barber.botEnabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${barber.botEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+
+              <div className="mt-auto pt-4 border-t border-gray-100">
                 {activeQrCode?.userId === barber.id ? (
                   <div className="flex flex-col items-center">
                     <img src={activeQrCode.base64} alt="QR Code" className="w-48 h-48 object-contain rounded-xl border p-2 mb-3 bg-white shadow-sm" />

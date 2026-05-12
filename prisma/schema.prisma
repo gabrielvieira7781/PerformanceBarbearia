@@ -56,9 +56,10 @@ model User {
 
   barbershop              Barbershop?  @relation(fields: [barbershopId], references: [id])
   services                ServiceLog[]
-  commissionRate          Float?   @default(50)       // Porcentagem de comissão (Ex: 50%)
-  paymentCycle            String?  @default("WEEKLY") // Ciclo: DAILY, WEEKLY, BIWEEKLY, MONTHLY
+  commissionRate          Float?       @default(50)       // Porcentagem de comissão (Ex: 50%)
+  paymentCycle            String?      @default("WEEKLY") // Ciclo: DAILY, WEEKLY, BIWEEKLY, MONTHLY
   appointments            Appointment[] // ADICIONE APENAS ESTA LINHA
+  botEnabled              Boolean      @default(true) // NOVO: Controle individual do Robô
 }
 
 // ==========================================

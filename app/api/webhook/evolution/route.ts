@@ -120,9 +120,9 @@ export async function POST(request: Request) {
             where: { barbershopId: barbershopId }
         });
 
-        if (!settings || !settings.botEnabled) {
-            console.log(`[WEBHOOK - STOP] Robô desativado nas configurações da barbearia.`);
-            return NextResponse.json({ status: 'bot_disabled' }, { status: 200 });
+        if (!userReceiver.botEnabled) {
+            console.log(`[WEBHOOK - STOP] Robô desativado individualmente pelo barbeiro ${userReceiver.name}.`);
+            return NextResponse.json({ status: 'bot_disabled_by_user' }, { status: 200 });
         }
 
         const phone = remoteJid.split('@')[0]; 
