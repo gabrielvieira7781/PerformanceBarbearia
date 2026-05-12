@@ -92,6 +92,8 @@ export async function POST(request: Request) {
         console.log('\n--- NOVA REQUISIÇÃO RECEBIDA ---');
         console.log(`[WEBHOOK - EVENTO] ${payload.event}`);
 
+        console.log(`[WEBHOOK - DEBUG TOTAL]`, JSON.stringify(payload.data, null, 2));
+
         if (payload.event !== 'messages.upsert') {
             return NextResponse.json({ status: 'ignored' }, { status: 200 });
         }
